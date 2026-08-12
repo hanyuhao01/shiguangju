@@ -695,7 +695,12 @@ function renderCategories(){
     wrap.appendChild(b);
     if(isEdit){
       var del=el('span','cat-btn-del','✕');
-      del.onclick=function(e){e.stopPropagation();deleteCategory(c);};
+      del.setAttribute('data-cat',c);
+      del.onclick=function(e){
+        e.stopPropagation();
+        var catName=this.getAttribute('data-cat');
+        deleteCategory(catName);
+      };
       wrap.appendChild(del);
     }
     row.appendChild(wrap);

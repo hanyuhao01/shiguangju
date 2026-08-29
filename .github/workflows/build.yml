@@ -1,6 +1,8 @@
 name: "Build Android APK"
 "on":
   workflow_dispatch:
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -22,10 +24,10 @@ jobs:
         run: npm install -g cordova
       - name: Build APK
         run: |
-          mkdir -p www
+          rm -rf www
+          mkdir www
           cp index.html www/
           cp -r icon-192.png icon-512.png www/ 2>/dev/null || true
-          cordova create . --link-to config.xml
           cordova platform add android --no-telemetry
           cordova plugin add ./plugin_src
           cordova build android --release

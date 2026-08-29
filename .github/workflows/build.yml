@@ -22,7 +22,7 @@ jobs:
         run: npm install -g cordova
       - name: Build APK
         run: |
-          mkdir www
+          mkdir -p www
           cp index.html www/
           cp -r icon-192.png icon-512.png www/ 2>/dev/null || true
           cordova create . --link-to config.xml

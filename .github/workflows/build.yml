@@ -28,8 +28,19 @@ jobs:
           mkdir www
           cp index.html www/
           cp -r icon-192.png icon-512.png www/ 2>/dev/null || true
-          cordova platform add android --no-telemetry
+          
+          # 强制使用兼容性更好的 Cordova Android 13 平台
+          cordova platform add android@13.0.0 --no-telemetry
           cordova plugin add ./plugin_src
+          
+          # 自动修复悬浮窗插件的 Java 语法错误 (清理 BOM 和 修复大括号)
+          FILE="platforms/android/app/src/main/java/com/lounai/cordova/floatingwindow/FloatingWindowService.java"
+          if [ -f "$FILE" ]; then
+            sed -i '1s/^\xef\xbb\xbf//' "$FILE"
+            sed -i 's/^public class FloatingWindowService.*/public class FloatingWindowService extends Service {/' "$FILE"
+            echo "Fixed FloatingWindowService.java"
+          fi
+          
           cordova build android --release
       - name: Upload APK
         uses: actions/upload-artifact@v4

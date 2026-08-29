@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="com.shiguangju.floatingwindow" version="1.0.0">
+    <name>FloatingWindow</name>
+    <description>全局悬浮窗（跨应用置顶）+ 前台服务保活</description>
+    <license>MIT</license>
+    <engines><engine name="cordova" version=">=9.0.0"/></engines>
+
+    <js-module name="FloatingWindow" src="www/floating-window.js">
+        <clobbers target="cordova.plugins.FloatingWindow"/>
+    </js-module>
+
+    <platform name="android">
+        <config-file target="config.xml" parent="/*">
+            <feature name="FloatingWindow">
+                <param name="android-package" value="com.shiguangju.FloatingWindowPlugin"/>
+            </feature>
+            <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+        </config-file>
+
+        <!-- 在 AndroidManifest 中声明前台服务并指定 type=dataSync（Android 14+ 必需） -->
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <service android:name="com.shiguangju.FloatingWindowService"
+                     android:exported="false"
+                     android:foregroundServiceType="dataSync"/>
+        </config-file>
+
+        <source-file src="src/main/java/com/shiguangju/FloatingWindowPlugin.java" target-dir="src/com/shiguangju"/>
+        <source-file src="src/main/java/com/shiguangju/FloatingWindowService.java" target-dir="src/com/shiguangju"/>
+
+        <resource-file src="res/layout/floating_window.xml" target="res/layout/floating_window.xml"/>
+        <resource-file src="res/drawable/fw_bg.xml" target="res/drawable/fw_bg.xml"/>
+        <resource-file src="res/drawable/fw_drag.xml" target="res/drawable/fw_drag.xml"/>
+        <resource-file src="res/drawable/fw_btn.xml" target="res/drawable/fw_btn.xml"/>
+        <resource-file src="res/drawable/fw_btn_small.xml" target="res/drawable/fw_btn_small.xml"/>
+    </platform>
+</plugin>

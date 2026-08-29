@@ -1,0 +1,11 @@
+{
+  "name": "com.shiguangju.floatingwindow",
+  "version": "1.0.0",
+  "description": "全局悬浮窗（跨应用置顶）+ 前台服务保活",
+  "cordova": {
+    "id": "com.shiguangju.floatingwindow",
+    "platforms": ["android"]
+  },
+  "keywords": ["cordova", "floating-window", "overlay"],
+  "license": "MIT"
+}

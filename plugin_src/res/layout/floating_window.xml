@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content" android:layout_height="wrap_content">
+
+    <!-- 展开态 -->
+    <LinearLayout android:id="@+id/expanded"
+        android:orientation="vertical"
+        android:background="@drawable/fw_bg"
+        android:padding="8dp"
+        android:elevation="6dp"
+        android:layout_width="wrap_content" android:layout_height="wrap_content">
+
+        <!-- 拖拽条 -->
+        <View android:id="@+id/dragHandle"
+            android:layout_width="40dp" android:layout_height="4dp"
+            android:background="@drawable/fw_drag"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="6dp"/>
+
+        <TextView android:id="@+id/tvTimer"
+            android:text="00:00:00" android:textSize="20sp" android:textStyle="bold"
+            android:textColor="#0a0e1a" android:layout_gravity="center_horizontal"/>
+
+        <TextView android:id="@+id/tvCategory"
+            android:text="工作" android:textSize="12sp" android:textColor="#00897b"
+            android:layout_gravity="center_horizontal" android:layout_marginTop="2dp"/>
+
+        <LinearLayout android:orientation="horizontal" android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp">
+            <Button android:id="@+id/btnPlay" android:text="▶" android:textSize="16sp"
+                android:background="@drawable/fw_btn" android:textColor="#fff"
+                android:layout_width="40dp" android:layout_height="40dp"/>
+            <Button android:id="@+id/btnSave" android:text="💾" android:textSize="16sp"
+                android:background="@drawable/fw_btn" android:textColor="#fff"
+                android:layout_width="40dp" android:layout_height="40dp" android:layout_marginStart="6dp"/>
+            <Button android:id="@+id/btnCategory" android:text="📂" android:textSize="16sp"
+                android:background="@drawable/fw_btn" android:textColor="#fff"
+                android:layout_width="40dp" android:layout_height="40dp" android:layout_marginStart="6dp"/>
+        </LinearLayout>
+
+        <LinearLayout android:orientation="horizontal" android:layout_gravity="center_horizontal"
+            android:layout_marginTop="6dp">
+            <Button android:id="@+id/btnCollapse" android:text="◀" android:textSize="12sp"
+                android:background="@drawable/fw_btn_small" android:textColor="#5a6488"
+                android:layout_width="wrap_content" android:layout_height="28dp" android:paddingLeft="8dp" android:paddingRight="8dp"/>
+            <Button android:id="@+id/btnHide" android:text="✕" android:textSize="12sp"
+                android:background="@drawable/fw_btn_small" android:textColor="#ef5350"
+                android:layout_width="wrap_content" android:layout_height="28dp" android:layout_marginStart="6dp" android:paddingLeft="8dp" android:paddingRight="8dp"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 折叠胶囊 -->
+    <LinearLayout android:id="@+id/collapsed"
+        android:orientation="horizontal" android:visibility="gone"
+        android:background="@drawable/fw_bg"
+        android:paddingLeft="10dp" android:paddingRight="10dp" android:paddingTop="6dp" android:paddingBottom="6dp"
+        android:layout_width="wrap_content" android:layout_height="wrap_content">
+        <TextView android:id="@+id/tvTimerCollapsed"
+            android:text="00:00:00" android:textSize="13sp" android:textStyle="bold"
+            android:textColor="#0a0e1a"/>
+        <View android:id="@+id/collapsedCapsule"
+            android:layout_width="14dp" android:layout_height="14dp"
+            android:background="@drawable/fw_drag" android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        id="com.shiguangju.app" version="1.0.0">
+    <name>拾光橘</name>
+    <description>高效的时间记录与复盘工具</description>
+    <author email="dev@shiguangju.local" href="https://shiguangju.local">拾光橘</author>
+    <content src="index.html"/>
+    <access origin="*" subdomains="true"/>
+    <preference name="AndroidLaunchMode" value="singleTask"/>
+    <preference name="AndroidWindowSoftInputMode" value="adjustResize"/>
+    <preference name="DisallowOverscroll" value="true"/>
+    <preference name="StatusBarOverlaysWebView" value="false"/>
+    <preference name="StatusBarBackgroundColor" value="#0a0e1a"/>
+    <preference name="StatusBarStyle" value="lightcontent"/>
+    <!-- 关键：允许 WebView 通过 file:// 加载本地资源，修复安卓 9+ ERR_CONNECTION_REFUSED (localhost) -->
+    <preference name="AndroidInsecureFileModeEnabled" value="true"/>
+    <preference name="MixedContentMode" value="2"/>
+
+    <!-- 权限由 plugin_src/plugin.xml 统一管理（含 SYSTEM_ALERT_WINDOW / FOREGROUND_SERVICE 等），此处不再重复声明，避免合并冲突 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
+
+    <platform name="android">
+        <allow-intent href="market:*"/>
+        <icon src="icon-192.png" density="mdpi"/>
+        <icon src="icon-192.png" density="hdpi"/>
+        <icon src="icon-192.png" density="xhdpi"/>
+        <icon src="icon-512.png" density="xxhdpi"/>
+        <icon src="icon-512.png" density="xxxhdpi"/>
+        <splash src="icon-512.png"/>
+    </platform>
+
+</widget>

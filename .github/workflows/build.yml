@@ -1,14 +1,36 @@
-   - name: Build APK
+name: "Build Android APK"
+"on":
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Cordova
+        run: npm install -g cordova
+      - name: Build APK
         run: |
-          # 创建 Cordova 必需的 www 文件夹并复制网页文件
           mkdir www
           cp index.html www/
           cp -r icon-192.png icon-512.png www/ 2>/dev/null || true
-          
-          # 初始化当前目录为 Cordova 项目（绑定已有的 config.xml）
           cordova create . --link-to config.xml
-          
-          # 添加平台和插件并构建
           cordova platform add android --no-telemetry
           cordova plugin add ./plugin_src
           cordova build android --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: shiguangju-apk
+          path: platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk

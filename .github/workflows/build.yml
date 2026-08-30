@@ -27,9 +27,9 @@ jobs:
           cp index.html www/
           cordova platform add android@13.0.0 --no-telemetry
           cordova plugin add ./plugin_src
-          cordova build android --release
+          cordova build android --release -- --packageType=apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: shiguangju-apk
-          path: platforms/android/app/build/outputs/apk/release/*.apk
+          path: platforms/android/app/build/outputs/**/*.apk

@@ -28,8 +28,26 @@ jobs:
           cordova platform add android@13.0.0 --no-telemetry
           cordova plugin add ./plugin_src
           cordova build android --release -- --packageType=apk
+      - name: Generate keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore release-key.jks \
+            -storepass 123456 \
+            -keypass 123456 \
+            -alias shiguangju \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Shiguangju, OU=App, O=Shiguangju, L=Unknown, S=Unknown, C=CN"
+      - name: Sign APK
+        run: |
+          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n1)/apksigner sign \
+            --ks release-key.jks \
+            --ks-key-alias shiguangju \
+            --ks-pass pass:123456 \
+            --key-pass pass:123456 \
+            --out platforms/android/app/build/outputs/apk/release/signed-app.apk \
+            platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: shiguangju-apk
-          path: platforms/android/app/build/outputs/**/*.apk
+          path: platforms/android/app/build/outputs/apk/release/signed-app.apk

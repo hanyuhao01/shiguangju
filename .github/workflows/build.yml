@@ -1,6 +1,9 @@
 name: Build Android APK
 on:
   workflow_dispatch:
+env:
+  KEYSTORE_PASSWORD: "123456"
+  KEY_ALIAS: "shiguangju"
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,22 +35,34 @@ jobs:
         run: |
           keytool -genkeypair -v \
             -keystore release-key.jks \
-            -storepass 123456 \
-            -keypass 123456 \
-            -alias shiguangju \
+            -storepass ${{ env.KEYSTORE_PASSWORD }} \
+            -keypass ${{ env.KEYSTORE_PASSWORD }} \
+            -alias ${{ env.KEY_ALIAS }} \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -dname "CN=Shiguangju, OU=App, O=Shiguangju, L=Unknown, S=Unknown, C=CN"
-      - name: Sign APK
+      - name: Sign APK (V1+V2+V3)
         run: |
-          $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n1)/apksigner sign \
+          BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n1)
+          echo "Using build-tools: $BUILD_TOOLS"
+          ORIG_APK="platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
+
+          # 强制 V1 + V2 + V3 全签名（关键：--min-sdk-version 保证 V1 签名）
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner sign \
             --ks release-key.jks \
-            --ks-key-alias shiguangju \
-            --ks-pass pass:123456 \
-            --key-pass pass:123456 \
-            --out platforms/android/app/build/outputs/apk/release/signed-app.apk \
-            platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            --ks-key-alias ${{ env.KEY_ALIAS }} \
+            --ks-pass pass:${{ env.KEYSTORE_PASSWORD }} \
+            --key-pass pass:${{ env.KEYSTORE_PASSWORD }} \
+            --min-sdk-version 21 \
+            --out signed-app.apk \
+            "$ORIG_APK"
+
+          echo "=== 验证签名结果 ==="
+          $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose signed-app.apk
+
+          echo "=== 确认 V1 签名区块存在 ==="
+          unzip -l signed-app.apk | grep -i "META-INF" || echo "V1 签名缺失！"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: shiguangju-apk
-          path: platforms/android/app/build/outputs/apk/release/signed-app.apk
+          path: signed-app.apk

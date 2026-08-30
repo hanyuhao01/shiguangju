@@ -67,4 +67,17 @@ public class FloatingWindowPlugin extends CordovaPlugin {
         Intent i = new Intent(cordova.getActivity(), FloatingWindowService.class);
         cordova.getActivity().stopService(i);
     }
+        // ===== 新增：悬浮窗按钮 → JS 回调 =====
+    private static CallbackContext toggleCallback;
+
+    public static void notifyToggle() {
+        if (toggleCallback != null) {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("action", "toggle");
+                toggleCallback.success(o); // JS 端会收到 onToggle
+            } catch (Exception ignored) {}
+        }
+    }
+
 }

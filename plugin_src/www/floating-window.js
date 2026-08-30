@@ -33,8 +33,31 @@ var FloatingWindow = {
 
     /** 内部：跳转 SYSTEM_ALERT_WINDOW 设置页（仅 Android） */
     _openOverlaySettings: function (cb) {
-        // 通过 exec 一个专用 action 让原生打开设置页；若原生未实现该 action，则 fallback 提示
         exec(function () { (cb || function () {})(true); }, function () { (cb || function () {})(false); }, 'FloatingWindow', 'openOverlaySettings', []);
+    },
+
+    // ===== 新增方法1：主界面每秒调用，把时间推给悬浮窗 =====
+    /**
+     * 更新悬浮窗上的数字
+     * @param {string} time   格式 "HH:MM:SS"，如 "00:00:03"
+     * @param {boolean} running  是否计时中
+     * @param {function} cb  回调(可选)
+     */
+    updateTime: function (time, running, cb) {
+        exec(
+            function () { (cb || function () {})(true); },
+            function () { (cb || function () {})(false); },
+            'FloatingWindow', 'updateTime', [time, !!running]
+        );
+    },
+
+    // ===== 新增方法2：注册"播放/暂停"按钮回调 =====
+    /**
+     * 监听悬浮窗上的播放/暂停按钮点击
+     * @param {function} cb  回调，点击时触发 cb({action:'toggle'})
+     */
+    onToggle: function (cb) {
+        exec(cb, function () {}, 'FloatingWindow', 'onToggle', []);
     }
 };
 

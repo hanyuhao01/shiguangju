@@ -8,9 +8,13 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.TextView;
 import android.graphics.PixelFormat;
 
+/**
+ * 全局悬浮窗服务。
+ * 注意：R 类由构建系统生成在应用包 com.shiguangju.app 下，
+ * 因此这里一律使用全限定名 com.shiguangju.app.R，不要 import。
+ */
 public class FloatingWindowService extends Service {
 
     private WindowManager wm;
@@ -29,13 +33,13 @@ public class FloatingWindowService extends Service {
         super.onCreate();
         wm = (WindowManager) getSystemService(WINDOW_SERVICE);
 
-        // ✅ 关键：inflate 你的漂亮布局，而不是裸 TextView
         LayoutInflater inflater = LayoutInflater.from(this);
-        floatView = inflater.inflate(R.layout.floating_window, null);
+        // ✅ 关键：用应用包名的 R，而不是本包 com.shiguangju.R
+        floatView = inflater.inflate(com.shiguangju.app.R.layout.floating_window, null);
 
         params = new WindowManager.LayoutParams(
-                320,  // width (dp 量级，可按需调)
-                120,  // height
+                320,
+                180,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
@@ -44,8 +48,7 @@ public class FloatingWindowService extends Service {
         params.x = 0;
         params.y = 100;
 
-        // 拖动逻辑
-        floatView.findViewById(R.id.fw_root).setOnTouchListener(new View.OnTouchListener() {
+        floatView.findViewById(com.shiguangju.app.R.id.fw_root).setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 switch (event.getAction()) {

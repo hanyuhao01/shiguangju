@@ -15,6 +15,20 @@ import org.json.JSONObject;
  *   hide(success)          停止并隐藏悬浮窗
  */
 public class FloatingWindowPlugin extends CordovaPlugin {
+
+    // ===== 新增：悬浮窗按钮 → JS 回调 =====
+    private static CallbackContext toggleCallback;
+
+    public static void notifyToggle() {
+        if (toggleCallback != null) {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("action", "toggle");
+                toggleCallback.success(o); // JS 端会收到 onToggle
+            } catch (Exception ignored) {}
+        }
+    }
+
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext cb) {
         switch (action) {
@@ -50,6 +64,20 @@ public class FloatingWindowPlugin extends CordovaPlugin {
                 }
                 return true;
             }
+            // ===== 新增两个 action =====
+            case "onToggle": {
+                // JS 注册回调监听：保存回调，不立即返回，供原生按钮触发
+                toggleCallback = cb;
+                return true;
+            }
+            case "updateTime": {
+                // JS 主动推数字给悬浮窗：time 字符串如 "00:00:03"，running 布尔
+                String time = args.optString(0, "");
+                boolean running = args.optBoolean(1, true);
+                FloatingWindowService.updateTime(cordova.getActivity(), time, running);
+                cb.success(1);
+                return true;
+            }
         }
         return false;
     }
@@ -67,17 +95,4 @@ public class FloatingWindowPlugin extends CordovaPlugin {
         Intent i = new Intent(cordova.getActivity(), FloatingWindowService.class);
         cordova.getActivity().stopService(i);
     }
-        // ===== 新增：悬浮窗按钮 → JS 回调 =====
-    private static CallbackContext toggleCallback;
-
-    public static void notifyToggle() {
-        if (toggleCallback != null) {
-            try {
-                JSONObject o = new JSONObject();
-                o.put("action", "toggle");
-                toggleCallback.success(o); // JS 端会收到 onToggle
-            } catch (Exception ignored) {}
-        }
-    }
-
 }

@@ -23,14 +23,26 @@ jobs:
         uses: android-actions/setup-android@v3
       - name: Install Cordova
         run: npm install -g cordova
-      - name: Build APK
+      - name: Prepare www folder
         run: |
           rm -rf www
           mkdir www
           cp index.html www/
+          if ! grep -q 'cordova.js' www/index.html; then
+            sed -i 's/<script>/<script src="cordova.js"><\/script>\n    <script>/' www/index.html
+          fi
+      - name: Build APK
+        run: |
           cordova platform add android@13.0.0 --no-telemetry
           cordova plugin add ./plugin_src
           cordova build android --release -- --packageType=apk
+      - name: Verify plugin is bundled
+        run: |
+          echo "=== 检查插件 JS ==="
+          find platforms/android/app/src/main/assets/www -name "floating-window.js" 2>/dev/null || echo "MISSING!"
+          find platforms/android/app/src/main/assets/www -name "cordova_plugins.js" 2>/dev/null || echo "MISSING!"
+          echo "=== 检查原生类 ==="
+          ls platforms/android/app/src/main/java/com/shiguangju/FloatingWindowPlugin.java 2>/dev/null || echo "MISSING!"
       - name: Generate keystore
         run: |
           keytool -genkeypair -v \
@@ -43,24 +55,25 @@ jobs:
       - name: Sign APK (V1+V2+V3)
         run: |
           BUILD_TOOLS=$(ls $ANDROID_HOME/build-tools | sort -V | tail -n1)
-          echo "Using build-tools: $BUILD_TOOLS"
           ORIG_APK="platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk"
-
-          # 强制 V1 + V2 + V3 全签名（关键：--min-sdk-version 保证 V1 签名）
+          if [ ! -f "$ORIG_APK" ]; then
+            echo "APK not found, searching...";
+            find platforms/android -name "*.apk" 2>/dev/null
+            exit 1
+          fi
           $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner sign \
             --ks release-key.jks \
             --ks-key-alias ${{ env.KEY_ALIAS }} \
             --ks-pass pass:${{ env.KEYSTORE_PASSWORD }} \
             --key-pass pass:${{ env.KEYSTORE_PASSWORD }} \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
             --min-sdk-version 21 \
             --out signed-app.apk \
             "$ORIG_APK"
-
-          echo "=== 验证签名结果 ==="
+          echo "=== 签名验证 ==="
           $ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner verify --verbose signed-app.apk
-
-          echo "=== 确认 V1 签名区块存在 ==="
-          unzip -l signed-app.apk | grep -i "META-INF" || echo "V1 签名缺失！"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

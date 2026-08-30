@@ -11,16 +11,21 @@
     </js-module>
 
     <platform name="android">
+        <!-- ① 注入到 config.xml：仅注册原生插件 feature -->
         <config-file target="config.xml" parent="/*">
             <feature name="FloatingWindow">
                 <param name="android-package" value="com.shiguangju.FloatingWindowPlugin"/>
             </feature>
+        </config-file>
+
+        <!-- ② 注入到 AndroidManifest.xml：权限声明（关键！） -->
+        <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
         </config-file>
 
-        <!-- 在 AndroidManifest 中声明前台服务并指定 type=dataSync（Android 14+ 必需） -->
+        <!-- ③ 注入到 AndroidManifest.xml：注册前台服务（Android 14+ 必需 foregroundServiceType） -->
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <service android:name="com.shiguangju.FloatingWindowService"
                      android:exported="false"

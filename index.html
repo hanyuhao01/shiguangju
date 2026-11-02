@@ -704,6 +704,8 @@ canvas { max-width:100%; }
   </div>
 </div>
 
+<link rel="stylesheet" href="v2.css">
+<script src="core.js"></script>
 <script>
 'use strict';
 function $(id){return document.getElementById(id);}
@@ -926,7 +928,6 @@ function initFloatWindow(){
   document.addEventListener('click',function(e){if(!fcm.contains(e.target)&&e.target!==fc)fcm.classList.remove('show');});
   // 更新悬浮窗
   updateFloat();
-  setInterval(updateFloat,1000);
 }
 function renderFloatCatMenu(){
   var m=$('floatCatMenu');m.innerHTML='';
@@ -984,7 +985,6 @@ function init(){
   initIndexedDB();
   initFloatWindow();
   renderAll();
-  setInterval(updateTimer,30000);
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
 </script>
@@ -993,20 +993,20 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
 <!-- ===== 后台权限 / 悬浮窗设置弹窗 ===== -->
 <div class="date-picker-popup" id="settingsPopup" style="max-width:340px;">
   <div class="date-picker-header">
-    <span>⚙️ 后台权限设置</span>
+    <span>⚙️ 设置</span>
     <button id="settingsClose" style="font-size:18px;">✕</button>
   </div>
+  <div id="v2Settings"></div>
+  <details><summary>悬浮窗权限</summary>
   <div style="padding:10px 0;font-size:13px;line-height:1.9;">
     <p style="margin-bottom:8px;">📌 <b>① 悬浮窗（显示在其他应用上层）</b><br>设置 → 应用设置 → 权限管理 → 特殊权限 → 显示在其他应用上层 → <b>始终允许</b></p>
-    <p style="margin-bottom:8px;">🔋 <b>② 电池无限制</b><br>设置 → 应用管理 → 拾光橘 → 电池与性能 → 省电策略 → <b>无限制</b></p>
-    <p style="margin-bottom:8px;">🛡️ <b>③ 锁屏保活</b><br>多任务界面（上滑） → 下拉应用卡片 → <b>锁定</b></p>
-    <p style="margin-bottom:8px;">🚀 <b>④ 自启动</b><br>设置 → 应用管理 → 自启动 → <b>开启</b></p>
+    <p>后台限制可能影响悬浮窗与提醒；计时状态会持久保存并在返回时恢复。无需授予电池优化豁免。</p>
     <p style="color:var(--text-muted);margin-top:10px;font-size:12px;">⚠️ 提示：当前悬浮窗在应用内始终置顶；如需「退出 App 后仍可见」的系统级悬浮窗，请确保已授予 ① 并重启 App。若首次打开未自动弹授权，请点下方「请求悬浮窗权限」。</p>
     <div style="text-align:center;margin-top:12px;">
       <button class="neu-btn ctrl-btn ctrl-btn-primary" id="requestFloatPermBtn" style="font-size:14px;">🔘 请求悬浮窗权限</button>
     </div>
   </div>
-</div>
+</details></div>
 
 <script>
 (function(){
@@ -1064,7 +1064,7 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
   window.canShowFloat = function(cb){
     if(!hasFloatPlugin()){ (cb||function(){})(false); return; }
     cordova.plugins.FloatingWindow.canShow(
-      function(g){ (cb||function(){})(g === "1" || g === true); },
+      function(g){ (cb||function(){})(g === "1" || g === true || g === 1); },
       function(){ (cb||function(){})(false); }
     );
   };
@@ -1074,7 +1074,8 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
     var btn = document.getElementById("settingsBtn");
     var closeBtn = document.getElementById("settingsClose");
     var reqBtn = document.getElementById("requestFloatPermBtn");
-    if(!popup || !btn) return;
+    if(!popup || !btn || popup.dataset.bound) return;
+    popup.dataset.bound='1';
     btn.addEventListener("click", function(){ popup.classList.add("show"); });
     if(closeBtn) closeBtn.addEventListener("click", function(){ popup.classList.remove("show"); });
     if(reqBtn) reqBtn.addEventListener("click", function(){
@@ -1096,5 +1097,6 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
   window.addEventListener("load", bindSettings);
 })();
 </script>
+<script src="v2.js"></script>
 </body>
 </html>

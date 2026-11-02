@@ -1,0 +1,65 @@
+name: V2 tests and isolated Android APK
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - run: npm test
+      - run: node tests/browser.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Prepare isolated test application
+        run: |
+          node scripts/prepare.cjs --test
+          npx cordova platform add android@13.0.0 --no-telemetry
+          npx cordova plugin add ./plugin_src
+      - name: Build actual debug APK
+        run: npx cordova build android --debug -- --packageType=apk
+      - name: Test actual Java timer, journal and overlay resources
+        run: |
+          node scripts/android-tests.cjs
+          gradle -p platforms/android :app:testDebugUnitTest
+      - name: Preserve Java test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: java-test-reports
+          path: |
+            platforms/android/app/build/reports/tests/
+            platforms/android/app/build/test-results/
+          if-no-files-found: ignore
+      - name: Verify package and signature
+        run: |
+          APK=platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -5
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK"
+          mkdir -p artifacts
+          cp "$APK" artifacts/shiguangju-v2.0.1-test.apk
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shiguangju-v2-test
+          path: |
+            artifacts/*.apk
+            artifacts/SHA256SUMS.txt
+            artifacts/*.png
+          if-no-files-found: error

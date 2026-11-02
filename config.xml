@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns="http://www.w3.org/ns/widgets"
         xmlns:android="http://schemas.android.com/apk/res/android"
-        id="com.shiguangju.app" version="1.0.0">
+        id="com.shiguangju.app" version="2.0.1" android-versionCode="20001">
     <name>拾光橘</name>
     <description>高效的时间记录与复盘工具</description>
     <author email="dev@shiguangju.local" href="https://shiguangju.local">拾光橘</author>
@@ -18,12 +18,6 @@
     <preference name="MixedContentMode" value="2"/>
 
     <!-- 权限由 plugin_src/plugin.xml 统一管理（含 SYSTEM_ALERT_WINDOW / FOREGROUND_SERVICE 等），此处不再重复声明，避免合并冲突 -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
 
     <platform name="android">
         <allow-intent href="market:*"/>
@@ -32,7 +26,7 @@
         <icon src="icon-192.png" density="xhdpi"/>
         <icon src="icon-512.png" density="xxhdpi"/>
         <icon src="icon-512.png" density="xxxhdpi"/>
-        <splash src="icon-512.png"/>
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="icon-512.png"/>
     </platform>
 
 </widget>

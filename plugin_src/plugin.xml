@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
         id="com.shiguangju.floatingwindow" version="1.0.0">
     <name>FloatingWindow</name>
     <description>全局悬浮窗（跨应用置顶）+ 前台服务保活</description>
@@ -22,18 +23,25 @@
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
             <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+            <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
         </config-file>
 
         <!-- ③ 注入到 AndroidManifest.xml：注册前台服务（Android 14+ 必需 foregroundServiceType） -->
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <service android:name="com.shiguangju.FloatingWindowService"
                      android:exported="false"
-                     android:foregroundServiceType="dataSync"/>
+                     android:foregroundServiceType="specialUse">
+                <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                          android:value="User-started visible floating timer with pause, category and save controls"/>
+            </service>
+            <receiver android:name="com.shiguangju.ReminderReceiver" android:exported="false"/>
         </config-file>
 
         <source-file src="src/main/java/com/shiguangju/FloatingWindowPlugin.java" target-dir="src/com/shiguangju"/>
         <source-file src="src/main/java/com/shiguangju/FloatingWindowService.java" target-dir="src/com/shiguangju"/>
+        <source-file src="src/main/java/com/shiguangju/TimerStore.java" target-dir="src/com/shiguangju"/>
+        <source-file src="src/main/java/com/shiguangju/ReminderReceiver.java" target-dir="src/com/shiguangju"/>
 
         <resource-file src="res/layout/floating_window.xml" target="res/layout/floating_window.xml"/>
         <resource-file src="res/drawable/fw_bg.xml" target="res/drawable/fw_bg.xml"/>

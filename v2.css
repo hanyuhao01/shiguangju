@@ -1,9 +1,12 @@
-#settingsPopup{max-height:88vh;overflow-y:auto;width:min(94vw,380px);padding:18px}
+#settingsPopup{top:6vh;left:50%;transform:translateX(-50%);max-height:88vh;overflow-y:auto;width:min(94vw,380px);padding:18px;background:#141a30;animation:none}
+[data-theme="light"] #settingsPopup{background:#fffaf2}
+#settingsPopup .date-picker-header{position:sticky;top:-18px;background:inherit;padding:12px 0;z-index:2}
 .v2-field{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0;font-size:14px}
 .v2-field input:not([type=checkbox]),.v2-field select{width:130px;min-height:38px;background:var(--card-bg);color:var(--text-primary);border:1px solid #8890a0;border-radius:8px}
 #v2Settings h3{margin:22px 0 12px;font-size:17px}#v2Settings small{display:block;line-height:1.7;margin:12px 0;color:var(--text-secondary)}
-#v2Settings button,.review-insights button{padding:10px 14px;min-height:44px}
+#v2Settings button,.review-insights button{padding:10px 14px;min-height:44px;border:1px solid #8896b8;border-radius:10px;background:var(--bg-layer2);color:var(--text-primary);font:inherit;margin:4px}
 .v2-health{position:fixed;bottom:24px;left:5%;width:90%;padding:18px;background:var(--card-bg);border:1px solid #4fc3f7;z-index:20000;border-radius:16px;box-shadow:0 6px 30px #0008}
 .v2-health button{padding:10px;margin:6px}.v2-stat{display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:12px}.v2-stat span{overflow-wrap:anywhere}
 #trendCanvas{width:100%;height:auto}#reviewInsights p{white-space:pre-wrap;line-height:1.8;font-size:14px}
-.cat-btn{border:2px solid transparent}.cat-filter-chip.active{color:#101628}.detail-item{gap:8px}.detail-item-cat{max-width:50%;overflow-wrap:anywhere}
+.cat-btn{border:2px solid transparent;text-shadow:none}.cat-filter-chip.active{color:#101628}.detail-item{gap:8px}.detail-item-cat{max-width:50%;overflow-wrap:anywhere}
+[data-theme] .cat-btn.active{box-shadow:0 0 0 2px currentColor;outline:none}

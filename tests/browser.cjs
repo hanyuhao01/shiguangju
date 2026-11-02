@@ -9,7 +9,7 @@ async function main(){await new Promise(r=>server.listen(0,'127.0.0.1',r));const
  browser=cp.spawn(chrome,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=9333','--user-data-dir='+path.join(out,'qa-profile-'+Date.now()),'--window-size=412,915','about:blank'],{windowsHide:true,stdio:'ignore'});
  let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:9333/json/list')).json();break;}catch{await sleep(100);}}if(!tabs)throw Error('Chrome debug endpoint unavailable');
  ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);if(m.error)p.reject(Error(m.error.message));else p.resolve(m.result);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text+' '+JSON.stringify(m.params.exceptionDetails.exception));};
- await call('Runtime.enable');await call('Page.enable');await call('Page.addScriptToEvaluateOnNewDocument',{source:"window.confirm=()=>true;window.alert=()=>{};"});
+ await call('Runtime.enable');await call('Page.enable');await call('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});await call('Page.addScriptToEvaluateOnNewDocument',{source:"window.confirm=()=>true;window.alert=()=>{};"});
  await call('Page.navigate',{url:'http://127.0.0.1:'+port+'/'});await ready();
  await check('initial offline page, settings and existing panels load',async()=>{assert.equal(await evalJS("document.querySelectorAll('#categoryRow .cat-btn').length"),8);assert.equal(await evalJS("document.querySelectorAll('#v2Settings h3').length"),4);});
  await check('start, pause, save and duplicate save through actual UI',async()=>{await evalJS("$('btnPrimary').click()");await sleep(1200);await evalJS("$('btnPrimary').click();$('btnSave').click();saveRecord()");const rows=await evalJS("records");assert.equal(rows.length,1);assert.ok(rows[0].duration>=1000);assert.ok(rows[0].duration<5000);assert.equal(await evalJS("timerState"),'idle');});
@@ -28,7 +28,7 @@ async function main(){await new Promise(r=>server.listen(0,'127.0.0.1',r));const
  assert.equal(await evalJS("records.length"),1);assert.equal(await evalJS("load('review_day',[])[0].note"),'手写笔记');assert.equal(await evalJS("mascotsMeta.length"),1);
  });
  await check('user text is rendered safely',async()=>{await evalJS("tasks=[{text:'<img src=x onerror=alert(1)>',done:false}];renderTasks()");assert.equal(await evalJS("document.querySelectorAll('#taskList img').length"),0);});
- await evalJS("switchTab('review')");const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'v2-review-mobile.png'),Buffer.from(shot.data,'base64'));
+ await evalJS("switchTab('review');$('panelReview').scrollIntoView()");const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'v2-review-mobile.png'),Buffer.from(shot.data,'base64'));
  await evalJS("$('settingsBtn').click()");const settings=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'v2-settings-mobile.png'),Buffer.from(settings.data,'base64'));
  assert.deepEqual(errors,[],'uncaught JavaScript exceptions');console.log('Browser integration: '+passed+' passed; 0 uncaught exceptions');
 }

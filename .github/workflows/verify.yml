@@ -1,8 +1,6 @@
 name: V2 tests and isolated Android APK
 on:
   pull_request:
-  push:
-    branches: ['codex/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +20,9 @@ jobs:
           distribution: temurin
           java-version: 17
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
@@ -44,5 +45,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: shiguangju-v2-test
-          path: artifacts/
+          path: |
+            artifacts/*.apk
+            artifacts/SHA256SUMS.txt
+            artifacts/*.png
           if-no-files-found: error

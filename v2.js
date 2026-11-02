@@ -93,7 +93,7 @@
       var old={},next={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);old[k]=localStorage.getItem(k);next[k]=old[k];}
       var skip=['timerSessionV2','autoReviewLastDate','preImportBackupV2'];Object.keys(b.storage).forEach(function(k){if(skip.includes(k))return;var incoming=JSON.parse(b.storage[k]),current=next[k]?JSON.parse(next[k]):null;
         if(k==='mascots_meta')return;
-        if(Array.isArray(incoming)){var arr=Array.isArray(current)?current.slice():[],seen=new Set(arr.map(fingerprint));incoming.forEach(function(v){var f=fingerprint(v);if(!seen.has(f)){seen.add(f);arr.push(v);}});next[k]=JSON.stringify(arr);}
+        if(Array.isArray(incoming)){var arr=Array.isArray(current)?current.slice():[],seen=new Set(arr.map(fingerprint)),ids=new Set(k==='records'?arr.map(function(v){return v.id;}).filter(Boolean):[]);incoming.forEach(function(v){var f=fingerprint(v);if(!seen.has(f)&&!(k==='records'&&v.id&&ids.has(v.id))){seen.add(f);if(k==='records'&&v.id)ids.add(v.id);arr.push(v);}});next[k]=JSON.stringify(arr);}
         else if(incoming&&typeof incoming==='object')next[k]=JSON.stringify(Object.assign(Object.create(null),incoming,current||{}));
         else if(current===null)next[k]=b.storage[k];
       });

@@ -5,7 +5,7 @@
   var originalRenderCategories=renderCategories;
   // User-controlled names and notes are text throughout the shared element helper.
   el=function(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
-  getCatColor=function(name){var color=SG.color(name,registry);if(!registry._saved||registry._saved!==JSON.stringify(registry)){save('categoryColors',registry);}return color;};
+  getCatColor=function(name){var old=registry[name],color=SG.color(name,registry);if(old!==color)save('categoryColors',registry);return color;};
   function baseElapsed(){return session.segments.reduce(function(n,s){return n+s.duration;},0)+(native?(session.activeDuration||0):session.active?Math.max(0,Date.now()-session.active.start):0);}
   function apply(s){session=s;timerState=s.state;timerCategory=s.category;elapsedBase=baseElapsed();clockBase=performance.now();timerElapsed=elapsedBase;save('timerSessionV2',s);
     var pending=s.pending||[],ids=pending.map(function(r){return r.id;}),known=new Set(records.map(function(r){return r.id;})),merged=records.concat(pending.filter(function(r){return !known.has(r.id);}));
@@ -14,7 +14,7 @@
   }
   function command(op,cat){if(busy)return;if(window.cordova&&!native){showToast('正在恢复计时，请稍候','info');return;}busy=true;
     if(native)native.command(op,cat,function(s){busy=false;apply(s);},function(e){busy=false;showToast('计时操作失败：'+e,'error');});
-    else {var result=SG.transition(session,op,Date.now(),cat),next=records.concat(result.records);if(result.records.length&&!save('records',next)){busy=false;return;}if(!save('timerSessionV2',result.session)){busy=false;return;}records=next;busy=false;apply(result.session);}
+    else {var now=session.active?session.active.start+Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0)):Date.now(),result=SG.transition(session,op,now,cat),known=new Set(records.map(function(r){return r.id;})),next=records.concat(result.records.filter(function(r){return !known.has(r.id);}));if(result.records.length&&!save('records',next)){busy=false;return;}if(!save('timerSessionV2',result.session)){busy=false;return;}records=next;busy=false;apply(result.session);}
     if(op==='pause'||op==='reset'||op==='save'||op==='category')reminderMark=0;
   }
   startTimer=function(){command('start');};stopTimer=function(){command('pause');};resetTimer=function(){if(confirm('重置当前未保存计时？'))command('reset');};
@@ -93,7 +93,7 @@
   function fingerprint(v){if(v&&v.category&&typeof v.duration==='number')return [v.date,v.start,v.end,v.duration,v.category,v.note||''].join('|');return JSON.stringify(v);}
   function boot(){clearInterval(timerInterval);timerInterval=null;elapsedBase=baseElapsed();clockBase=performance.now();timerState=session.state;timerCategory=session.category;renderAll();renderSettings();catchup();
     $('detailClear').onclick=function(){var rows=getRecordsForDate(getSelectedDateStr());if(!rows.length||!confirm('删除这一天涉及的整条活动记录？跨日活动也会删除。'))return;var sources=new Set(rows.map(function(r){return r.source;})),next=records.filter(function(r){return !sources.has(r);});if(save('records',next)){records=next;renderAll();}};
-    setInterval(function(){if(!document.hidden){updateTimer();checkReminder();}if(new Date().getSeconds()<2)catchup();},1000);
+    var lastReviewMinute='';setInterval(function(){if(!document.hidden){updateTimer();checkReminder();var minute=getToday()+':'+new Date().getHours()+':'+new Date().getMinutes();if(lastReviewMinute!==minute){lastReviewMinute=minute;catchup();}}},1000);
     document.addEventListener('visibilitychange',function(){if(!document.hidden){if(native)native.state(apply);else {elapsedBase=baseElapsed();clockBase=performance.now();}catchup();}});
     document.addEventListener('resume',function(){if(native)native.state(apply);catchup();});
     document.addEventListener('deviceready',function(){native=cordova.plugins&&cordova.plugins.FloatingWindow;if(!native){showToast('原生计时插件加载失败，请勿开始新计时','error');return;}native.state(apply);native.subscribe(apply);configure();});

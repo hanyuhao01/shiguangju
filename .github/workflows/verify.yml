@@ -1,0 +1,48 @@
+name: V2 tests and isolated Android APK
+on:
+  pull_request:
+  push:
+    branches: ['codex/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - run: npm test
+      - run: node tests/browser.cjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Prepare isolated test application
+        run: |
+          node scripts/prepare.cjs --test
+          npx cordova platform add android@13.0.0 --no-telemetry
+          npx cordova plugin add ./plugin_src
+      - name: Build actual debug APK
+        run: npx cordova build android --debug -- --packageType=apk
+      - name: Verify package and signature
+        run: |
+          APK=platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | head -5
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK"
+          mkdir -p artifacts
+          cp "$APK" artifacts/shiguangju-v2.0.0-test.apk
+          sha256sum artifacts/*.apk > artifacts/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shiguangju-v2-test
+          path: artifacts/
+          if-no-files-found: error

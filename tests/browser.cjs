@@ -1,0 +1,41 @@
+/* Actual application in a separate headless Chrome profile; never opens the user's browser data. */
+const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),cp=require('node:child_process'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'artifacts');fs.mkdirSync(out,{recursive:true});
+const chrome=process.env.CHROME_BIN||(process.platform==='win32'?'C:/Program Files/Google/Chrome/Application/chrome.exe':'google-chrome');
+const server=http.createServer((req,res)=>{let name=decodeURIComponent(req.url.split('?')[0]);if(name==='/cordova.js'){res.end('');return;}if(name==='/')name='/index.html';let f=path.resolve(root,'.'+name);if(!f.startsWith(root+path.sep)){res.writeHead(403).end();return;}fs.readFile(f,(e,b)=>{if(e){res.writeHead(404).end();return;}res.setHeader('Content-Type',f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':'text/html');res.end(b);});});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let browser,ws,id=0,pending=new Map(),errors=[],passed=0;
+async function main(){await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;
+ browser=cp.spawn(chrome,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=9333','--user-data-dir='+path.join(out,'qa-profile-'+Date.now()),'--window-size=412,915','about:blank'],{windowsHide:true,stdio:'ignore'});
+ let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:9333/json/list')).json();break;}catch{await sleep(100);}}if(!tabs)throw Error('Chrome debug endpoint unavailable');
+ ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);if(m.error)p.reject(Error(m.error.message));else p.resolve(m.result);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text+' '+JSON.stringify(m.params.exceptionDetails.exception));};
+ await call('Runtime.enable');await call('Page.enable');await call('Page.addScriptToEvaluateOnNewDocument',{source:"window.confirm=()=>true;window.alert=()=>{};"});
+ await call('Page.navigate',{url:'http://127.0.0.1:'+port+'/'});await ready();
+ await check('initial offline page, settings and existing panels load',async()=>{assert.equal(await evalJS("document.querySelectorAll('#categoryRow .cat-btn').length"),8);assert.equal(await evalJS("document.querySelectorAll('#v2Settings h3').length"),4);});
+ await check('start, pause, save and duplicate save through actual UI',async()=>{await evalJS("$('btnPrimary').click()");await sleep(1200);await evalJS("$('btnPrimary').click();$('btnSave').click();saveRecord()");const rows=await evalJS("records");assert.equal(rows.length,1);assert.ok(rows[0].duration>=1000);assert.ok(rows[0].duration<5000);assert.equal(await evalJS("timerState"),'idle');});
+ await check('refresh restores a running web session and no extra records',async()=>{await evalJS("startTimer()");await sleep(100);await call('Page.reload');await ready();assert.equal(await evalJS("timerState"),'running');await evalJS("stopTimer();saveRecord()");assert.equal(await evalJS("records.length"),2);});
+ await check('midnight totals, all charts, detail and review agree',async()=>{await evalJS("records=[{id:'cross',category:'工作',date:'2026-12-31',start:'2026-12-31T23:50:00',end:'2027-01-01T00:10:00',duration:1200000,segments:[{start:+new Date('2026-12-31T23:50:00'),end:+new Date('2027-01-01T00:10:00'),duration:1200000,category:'工作'}]}];save('records',records);setCurrentDate(new Date(2027,0,1));");
+  assert.equal(await evalJS("getRecordsForRange('day').reduce((n,r)=>n+r.duration,0)"),600000);assert.equal(await evalJS("getDataForRangeMulti('day',['工作'])[0].values.reduce((a,b)=>a+b,0)"),600000);assert.ok((await evalJS("$('dataBars').textContent")).includes('00:10:00'));assert.ok((await evalJS("$('detailList').textContent")).includes('00:10:00'));
+ });
+ await check('colors persist across theme and order; none filter is empty',async()=>{const color=await evalJS("getCatColor('工作')");await evalJS("categories.reverse();applyTheme('light');selectedCats=[];renderAll()");assert.equal(await evalJS("getCatColor('工作')"),color);assert.ok((await evalJS("$('dataBars').textContent")).includes('00:00:00'));await evalJS("selectedCats=null;applyTheme('dark')");});
+ await check('automatic review is separate from handwritten notes and idempotent',async()=>{await evalJS("save('review_day',[{date:'2027-01-01',score:4,tags:['保留'],note:'手写笔记'}]);switchReviewType('day');document.querySelector('#reviewInsights button').click();document.querySelector('#reviewInsights button').click();");
+ assert.equal(await evalJS("load('review_day',[])[0].note"),'手写笔记');assert.equal(await evalJS("Object.keys(load('autoReviewsV2',{})).filter(k=>k==='day:2027-01-01').length"),1);assert.ok((await evalJS("$('reviewInsights').textContent")).includes('10分钟'));
+ });
+ await check('real IndexedDB mascot and JSON export cover all stores',async()=>{await evalJS("new Promise(resolve=>saveImageToDB('data:image/png;base64,iVBORw0KGgo=',id=>{mascotsMeta=[{id}];save('mascots_meta',mascotsMeta);resolve();}))");
+ await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:out});await evalJS("Array.from(document.querySelectorAll('#v2Settings button')).find(b=>b.textContent.includes('导出完整')).click()");let file;for(let i=0;i<100;i++){file=fs.readdirSync(out).find(f=>f.endsWith('.json')&&f.startsWith('拾光橘备份'));if(file)break;await sleep(50);}assert.ok(file);const b=JSON.parse(fs.readFileSync(path.join(out,file),'utf8'));assert.equal(b.schema,2);assert.equal(b.images.length,1);assert.ok(b.storage.records);assert.ok(b.storage.review_day);
+ // Re-import twice through file input: records, notes and mascots must remain unchanged.
+ for(let i=0;i<2;i++){await call('DOM.enable');const doc=await call('DOM.getDocument');const q=await call('DOM.querySelector',{nodeId:doc.root.nodeId,selector:'#v2Settings input[type=file]'});await call('DOM.setFileInputFiles',{nodeId:q.nodeId,files:[path.join(out,file)]});await sleep(600);await ready();}
+ assert.equal(await evalJS("records.length"),1);assert.equal(await evalJS("load('review_day',[])[0].note"),'手写笔记');assert.equal(await evalJS("mascotsMeta.length"),1);
+ });
+ await check('user text is rendered safely',async()=>{await evalJS("tasks=[{text:'<img src=x onerror=alert(1)>',done:false}];renderTasks()");assert.equal(await evalJS("document.querySelectorAll('#taskList img').length"),0);});
+ await evalJS("switchTab('review')");const shot=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'v2-review-mobile.png'),Buffer.from(shot.data,'base64'));
+ await evalJS("$('settingsBtn').click()");const settings=await call('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'v2-settings-mobile.png'),Buffer.from(settings.data,'base64'));
+ assert.deepEqual(errors,[],'uncaught JavaScript exceptions');console.log('Browser integration: '+passed+' passed; 0 uncaught exceptions');
+}
+function call(method,params={}){return new Promise((resolve,reject)=>{const key=++id;pending.set(key,{resolve,reject});ws.send(JSON.stringify({id:key,method,params}));});}
+async function evalJS(expression){const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
+async function ready(){for(let i=0;i<100;i++){if(await evalJS("document.querySelector('#v2Settings h3')!==null")){await sleep(100);return;}await sleep(50);}console.error(await evalJS("({url:location.href,state:document.readyState,scripts:Array.from(document.scripts).map(s=>s.src),body:document.body.innerText.slice(-1800),sg:typeof SG})"));throw Error('app did not initialize');}
+async function check(name,fn){await fn();passed++;console.log('PASS '+name);}
+main().catch(e=>{console.error(e);console.error('Page exceptions',errors);process.exitCode=1;}).finally(async()=>{if(ws)try{await call('Browser.close');}catch{}if(browser)browser.kill();server.close();});
+
+

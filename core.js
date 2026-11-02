@@ -42,8 +42,19 @@
   function reminder(s,settings,now,mark){const type=settings.categories[s.category]||'none',rule=settings.types[type];if(!settings.enabled||s.state!=='running'||!s.active||!rule||!rule.enabled||quiet(now,settings.dndStart,settings.dndEnd))return null;const ms=(s.reminderElapsed||0)+Math.max(0,now-s.active.start),interval=rule.minutes*60000;if(ms<interval||ms-(mark||0)<interval)return null;return {type,minutes:rule.minutes,at:now,activeMs:ms};}
   function validateBackup(b){if(!b||b.app!=='shiguangju'||b.schema!==2||!b.storage||typeof b.storage!=='object'||Array.isArray(b.storage)||!Array.isArray(b.images))throw Error('备份格式或版本不支持');
     for(const [k,v] of Object.entries(b.storage)){if(typeof v!=='string'||['__proto__','constructor','prototype'].includes(k))throw Error('无效存储项');JSON.parse(v);}
-    const rec=JSON.parse(b.storage.records||'[]');if(!Array.isArray(rec)||rec.some(r=>!finite(r.duration)||typeof r.category!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||!Number.isFinite(Date.parse(r.start))||!Number.isFinite(Date.parse(r.end))))throw Error('记录格式不正确');
+    const rec=JSON.parse(b.storage.records||'[]');if(!Array.isArray(rec)||rec.some(r=>!r||!finite(r.duration)||!Number.isInteger(r.duration)||typeof r.category!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||day(date(r.date))!==r.date||!Number.isFinite(Date.parse(r.start))||!Number.isFinite(Date.parse(r.end))||Date.parse(r.end)<Date.parse(r.start)))throw Error('记录格式不正确');
+    for(const r of rec)if(r.segments!==undefined){if(!Array.isArray(r.segments)||r.segments.some(x=>!x||!finite(x.start)||!finite(x.end)||!finite(x.duration)||!Number.isInteger(x.duration)||x.end<x.start||x.duration>x.end-x.start||typeof x.category!=='string')||r.segments.reduce((n,x)=>n+x.duration,0)!==r.duration)throw Error('活动片段与记录时长不一致');}
     for(const key of ['categories','tasks','mascots_meta','review_day','review_week','review_month','review_year'])if(b.storage[key]&&!Array.isArray(JSON.parse(b.storage[key])))throw Error(key+'格式不正确');
-    if(b.images.some(i=>!Number.isInteger(i.id)||i.id<1||typeof i.data!=='string'||!/^data:image\/(png|jpeg|gif|webp);base64,/.test(i.data)))throw Error('图片格式不正确');return b;}
+    const value=k=>b.storage[k]===undefined?undefined:JSON.parse(b.storage[k]);
+    if(value('categories')&&(!value('categories').length||value('categories').some(c=>typeof c!=='string'||!c.trim())))throw Error('类别格式不正确');
+    if(value('tasks')&&value('tasks').some(t=>!t||typeof t.text!=='string'||typeof t.done!=='boolean'))throw Error('任务格式不正确');
+    for(const k of ['review_day','review_week','review_month','review_year'])if(value(k)&&value(k).some(r=>!r||!Number.isInteger(r.score)||r.score<0||r.score>5||!Array.isArray(r.tags)||r.tags.some(t=>typeof t!=='string')||typeof r.note!=='string'||typeof r.date!=='string'))throw Error('复盘格式不正确');
+    for(const k of ['categoryIcons','categoryColors','autoReviewsV2'])if(value(k)&&(typeof value(k)!=='object'||Array.isArray(value(k))))throw Error(k+'格式不正确');
+    if(value('dailyGoalHours')!==undefined&&(!finite(value('dailyGoalHours'))||value('dailyGoalHours')<1||value('dailyGoalHours')>24))throw Error('目标时长不正确');
+    if(value('theme')!==undefined&&!['dark','light'].includes(value('theme')))throw Error('主题格式不正确');
+    const clock=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
+    const review=value('autoReviewSettings');if(review&&(typeof review.enabled!=='boolean'||!clock(review.time)))throw Error('自动复盘设置不正确');
+    const health=value('healthReminders');if(health){if(typeof health.enabled!=='boolean'||typeof health.system!=='boolean'||typeof health.sound!=='boolean'||!clock(health.dndStart)||!clock(health.dndEnd)||!health.categories||!health.types)throw Error('提醒设置不正确');for(const type of Object.keys(reminderDefaults().types)){const rule=health.types[type];if(!rule||typeof rule.enabled!=='boolean'||!Number.isInteger(rule.minutes)||rule.minutes<1||rule.minutes>240)throw Error('提醒间隔不正确');}}
+    if(b.images.some(i=>!i||!Number.isInteger(i.id)||i.id<1||typeof i.data!=='string'||!/^data:image\/(png|jpeg|gif|webp);base64,/.test(i.data)))throw Error('图片格式不正确');return b;}
   return {uid,day,date,bounds,idle,elapsed,transition,slices,range,aggregate,color,review,reminderDefaults,quiet,reminder,validateBackup};
 });

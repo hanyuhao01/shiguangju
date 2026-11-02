@@ -36,6 +36,14 @@ public class TimerStoreTest {
         JSONObject start=TimerStore.command(c,"start","");SystemClock.sleep(7200000);JSONObject restored=TimerStore.snapshot(c);
         assertEquals(start.getString("id"),restored.getString("id"));assertEquals(7200000,restored.getLong("activeDuration"));
     }
+    @Test public void changedWallAnchorDoesNotChangeMonotonicDuration() throws Exception {
+        TimerStore.command(c,"start","");SystemClock.sleep(5000);JSONObject s=TimerStore.read(c);s.getJSONObject("active").put("start",System.currentTimeMillis()+86400000);
+        c.getSharedPreferences("sg_timer_v2",0).edit().putString("state",s.toString()).commit();assertEquals(5000,TimerStore.snapshot(c).getLong("activeDuration"));
+    }
+    @Test public void reminderPausedTimeDoesNotCount() throws Exception {
+        TimerStore.command(c,"start","");SystemClock.sleep(25*60000);TimerStore.command(c,"pause","");SystemClock.sleep(60*60000);TimerStore.command(c,"start","");SystemClock.sleep(25*60000);JSONObject s=TimerStore.snapshot(c);
+        assertEquals(50*60000,s.optLong("reminderElapsed")+s.getLong("activeDuration"));TimerStore.command(c,"category","阅读");assertEquals(0,TimerStore.snapshot(c).optLong("reminderElapsed"));
+    }
     @Test public void everyNativeControlResourceExists() {
         for(String id:new String[]{"expanded","collapsed","dragHandle","tvTimer","tvTimerCollapsed","tvCategory","btnPlay","btnSave","btnCategory","btnCollapse","btnHide"})assertTrue(id,c.getResources().getIdentifier(id,"id",c.getPackageName())!=0);
         assertTrue(c.getResources().getIdentifier("floating_window","layout",c.getPackageName())!=0);

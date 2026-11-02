@@ -6,8 +6,8 @@ const server=http.createServer((req,res)=>{let name=decodeURIComponent(req.url.s
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let browser,ws,id=0,pending=new Map(),errors=[],passed=0;
 async function main(){await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;
- browser=cp.spawn(chrome,['--headless=new','--no-first-run','--no-default-browser-check','--remote-debugging-port=9333','--user-data-dir='+path.join(out,'qa-profile-'+Date.now()),'--window-size=412,915','about:blank'],{windowsHide:true,stdio:'ignore'});
- let tabs;for(let i=0;i<100;i++){try{tabs=await (await fetch('http://127.0.0.1:9333/json/list')).json();break;}catch{await sleep(100);}}if(!tabs)throw Error('Chrome debug endpoint unavailable');
+ let diagnostics='';browser=cp.spawn(chrome,['--headless=new','--disable-dev-shm-usage',...(process.env.CI?['--no-sandbox']:[]),'--no-first-run','--no-default-browser-check','--remote-debugging-port=9333','--user-data-dir='+path.join(out,'qa-profile-'+Date.now()),'--window-size=412,915','about:blank'],{windowsHide:true,stdio:['ignore','ignore','pipe']});browser.stderr.on('data',b=>{diagnostics=(diagnostics+b).slice(-8000);});
+ let tabs;for(let i=0;i<300;i++){try{tabs=await (await fetch('http://127.0.0.1:9333/json/list')).json();break;}catch{await sleep(100);}}if(!tabs)throw Error('Chrome debug endpoint unavailable: '+diagnostics);
  ws=new WebSocket(tabs.find(t=>t.type==='page').webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);pending.delete(m.id);if(m.error)p.reject(Error(m.error.message));else p.resolve(m.result);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text+' '+JSON.stringify(m.params.exceptionDetails.exception));};
  await call('Runtime.enable');await call('Page.enable');await call('Emulation.setDeviceMetricsOverride',{width:412,height:915,deviceScaleFactor:1,mobile:true});await call('Page.addScriptToEvaluateOnNewDocument',{source:"window.confirm=()=>true;window.alert=()=>{};"});
  await call('Page.navigate',{url:'http://127.0.0.1:'+port+'/'});await ready();

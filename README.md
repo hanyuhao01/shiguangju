@@ -1,4 +1,4 @@
-# 拾光橘 V2
+# 拾光橘 V2.0.1
 
 保留现有 Cordova 页面、计时、任务、复盘、吉祥物、主题和悬浮窗；加入可靠计时、本地规则复盘、休息提醒与 JSON 备份。核心功能离线运行，没有模型 API。
 
@@ -27,7 +27,9 @@ node scripts/android-tests.cjs
 gradle -p platforms/android :app:testDebugUnitTest
 ```
 
-prepare --test 会修改该副本 config.xml 的包名为 com.shiguangju.test，显示名为“拾光橘 V2 测试”。APK 在 platforms/android/app/build/outputs/apk/debug/app-debug.apk。
+prepare --test 会按版本号创建独立测试包；2.0.1 的包名为 com.shiguangju.test.v20001，显示名为“拾光橘 V2.0.1 测试”。由于旧测试包的临时私钥未保留，新版本并排安装，保留旧正式版及旧测试版的数据。APK 在 platforms/android/app/build/outputs/apk/debug/app-debug.apk。
+
+分类颜色不再按8色循环：保留已有独立颜色、自动修复旧重复颜色，后续新增优先选择与现有分类差异较大的空闲颜色。删除分类的颜色仍保留，重加时保持一致；首次修复前的映射另存本地快照。
 
 PR 自动执行上述流程，绿色运行的 shiguangju-v2-test 制品含 APK、SHA256 和界面截图；java-test-reports 含原生测试报告。不要用中间失败运行的包。
 

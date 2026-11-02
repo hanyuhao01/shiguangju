@@ -3,6 +3,7 @@ import android.app.*;
 import android.content.*;
 import android.content.pm.ServiceInfo;
 import android.graphics.PixelFormat;
+import android.graphics.Color;
 import android.os.*;
 import android.provider.Settings;
 import android.view.*;
@@ -39,7 +40,12 @@ public class FloatingWindowService extends Service {
     }catch(Exception e){error(e);stopSelf();}}
     private void error(Exception e){android.util.Log.e("SGOverlay","overlay error",e);Toast.makeText(this,"悬浮窗暂不可用，请返回应用查看计时",Toast.LENGTH_LONG).show();}
     private void act(String op,String cat){try{TimerStore.command(this,op,cat);FloatingWindowPlugin.changed(this);render();}catch(Exception e){error(e);}}
-    private void render(){if(view==null)return;try{JSONObject s=TimerStore.snapshot(this);long ms=s.optLong("activeDuration");JSONArray a=s.getJSONArray("segments");for(int i=0;i<a.length();i++)ms+=a.getJSONObject(i).getLong("duration");long sec=ms/1000;String text=String.format(Locale.US,"%02d:%02d:%02d",sec/3600,sec/60%60,sec%60);((TextView)v("tvTimer")).setText(text);((TextView)v("tvTimerCollapsed")).setText(text);((TextView)v("tvCategory")).setText(s.getString("category"));((Button)v("btnPlay")).setText("running".equals(s.getString("state"))?"Ⅱ":"▶");}catch(Exception e){android.util.Log.e("SGOverlay","render",e);}}
+    static void applyCategoryColor(Context context,TextView badge,String category) throws JSONException {
+        JSONObject colors=new JSONObject(context.getSharedPreferences("sg_timer_v2",0).getString("categoryColors","{}"));
+        String hex=colors.optString(category,"#4fc3f7");if(!hex.matches("#[0-9a-fA-F]{6}"))hex="#4fc3f7";
+        badge.setBackgroundColor(Color.parseColor(hex));badge.setTextColor(Color.parseColor("#101628"));
+    }
+    private void render(){if(view==null)return;try{JSONObject s=TimerStore.snapshot(this);long ms=s.optLong("activeDuration");JSONArray a=s.getJSONArray("segments");for(int i=0;i<a.length();i++)ms+=a.getJSONObject(i).getLong("duration");long sec=ms/1000;String text=String.format(Locale.US,"%02d:%02d:%02d",sec/3600,sec/60%60,sec%60);((TextView)v("tvTimer")).setText(text);((TextView)v("tvTimerCollapsed")).setText(text);((TextView)v("tvCategory")).setText(s.getString("category"));applyCategoryColor(this,(TextView)v("tvCategory"),s.getString("category"));((Button)v("btnPlay")).setText("running".equals(s.getString("state"))?"Ⅱ":"▶");}catch(Exception e){android.util.Log.e("SGOverlay","render",e);}}
     @Override public int onStartCommand(Intent i,int flags,int start){return START_NOT_STICKY;}
     @Override public void onDestroy(){handler.removeCallbacksAndMessages(null);if(view!=null&&wm!=null)try{wm.removeView(view);}catch(IllegalArgumentException ignored){}view=null;super.onDestroy();}
 }

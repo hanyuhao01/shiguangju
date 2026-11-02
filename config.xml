@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget xmlns="http://www.w3.org/ns/widgets"
         xmlns:android="http://schemas.android.com/apk/res/android"
-        id="com.shiguangju.app" version="2.0.0" android-versionCode="20000">
+        id="com.shiguangju.app" version="2.0.1" android-versionCode="20001">
     <name>拾光橘</name>
     <description>高效的时间记录与复盘工具</description>
     <author email="dev@shiguangju.local" href="https://shiguangju.local">拾光橘</author>

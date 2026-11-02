@@ -1,7 +1,7 @@
 /* Shared offline calculations. Durations are integer milliseconds; intervals are half-open. */
 (function(root,factory){if(typeof module==='object')module.exports=factory();else root.SG=factory();})(this,function(){
   'use strict';
-  const PALETTE=['#64ffda','#4fc3f7','#b388ff','#f48fb1','#ffb74d','#81c784','#ef5350','#ce93d8'];
+  const PALETTE=['#4fc3f7','#ffb74d','#b388ff','#81c784','#f48fb1','#64ffda','#ef5350','#fdd835'];
   const finite=n=>Number.isFinite(n)&&n>=0;
   const uid=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);
   const day=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
@@ -25,7 +25,35 @@
     }return out;}
   function range(records,type,key,cats){const [a,b]=bounds(type,key);return slices(records).filter(r=>+date(r.date)>=a&&+date(r.date)<b&&(!cats||cats.includes(r.category)));}
   function aggregate(rows){const cats=Object.create(null);let total=0;for(const r of rows){if(!finite(r.duration))continue;cats[r.category]=(cats[r.category]||0)+r.duration;total+=r.duration;}return {total,cats,percent:Object.fromEntries(Object.entries(cats).map(([k,v])=>[k,total?v/total*100:0]))};}
-  function color(name,registry){if(registry[name]&&/^#[0-9a-f]{6}$/i.test(registry[name]))return registry[name];let h=0;for(let i=0;i<name.length;i++)h=((h<<5)-h+name.charCodeAt(i))|0;return registry[name]=PALETTE[Math.abs(h)%PALETTE.length];}
+  const validColor=c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c);
+  function rgb(c){return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16)/255);}
+  function linear(v){return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);}
+  function luminance(c){const [r,g,b]=rgb(c).map(linear);return r*0.2126+g*0.7152+b*0.0722;}
+  // Every generated badge color keeps readable dark text in both application themes.
+  function textContrast(c){return (luminance(c)+0.05)/(luminance('#101628')+0.05);}
+  function lab(c){const [r,g,b]=rgb(c).map(linear),f=t=>t>216/24389?Math.cbrt(t):t*841/108+4/29;
+    const x=f((r*0.4124564+g*0.3575761+b*0.1804375)/0.95047),y=f(r*0.2126729+g*0.7151522+b*0.072175),z=f((r*0.0193339+g*0.119192+b*0.9503041)/1.08883);
+    return [116*y-16,500*(x-y),200*(y-z)];}
+  function colorDistance(a,b){const x=lab(a),y=lab(b);return Math.hypot(...x.map((v,i)=>v-y[i]));}
+  function hsl(h,s,l){s/=100;l/=100;const a=s*Math.min(l,1-l),f=n=>{const k=(n+h/30)%12;return Math.round(255*(l-a*Math.max(-1,Math.min(k-3,9-k,1)))).toString(16).padStart(2,'0');};return '#'+f(0)+f(8)+f(4);}
+  let colorCandidates;
+  function candidates(){if(!colorCandidates){const all=PALETTE.slice();for(const l of [48,62,76])for(const s of [90,68,48])for(let h=0;h<360;h+=5)all.push(hsl(h,s,l));colorCandidates=Array.from(new Set(all)).filter(c=>textContrast(c)>=4.5).map(c=>({hex:c,lab:lab(c)}));}return colorCandidates;}
+  function setColor(registry,name,value){Object.defineProperty(registry,name,{value,writable:true,enumerable:true,configurable:true});return value;}
+  function color(name,registry){
+    const keys=Object.keys(registry),current=Object.prototype.hasOwnProperty.call(registry,name)?registry[name]:null;
+    // Retain the first owner of an existing color; repair later duplicates deterministically.
+    if(validColor(current)&&keys.find(k=>validColor(registry[k])&&registry[k].toLowerCase()===current.toLowerCase())===name)return setColor(registry,name,current.toLowerCase());
+    const used=new Set(keys.filter(k=>k!==name&&validColor(registry[k])).map(k=>registry[k].toLowerCase()));
+    if(!used.size)return setColor(registry,name,PALETTE[0]);
+    const points=Array.from(used,lab);let best=null,score=-1;
+    // Maximize separation from the closest existing category in perceptual Lab space.
+    for(const c of candidates()){if(used.has(c.hex))continue;let nearest=Infinity;for(const p of points){const d=c.lab.reduce((n,v,i)=>n+(v-p[i])**2,0);nearest=Math.min(nearest,d);if(nearest<=score)break;}if(nearest>score){best=c.hex;score=nearest;}}
+    if(best)return setColor(registry,name,best);
+    // Beyond the candidate set, continue assigning distinct RGB values instead of cycling.
+    for(let i=0;i<0x1000000;i++){const hex='#'+((Math.imul(i,2654435761)>>>0)&0xffffff).toString(16).padStart(6,'0');if(!used.has(hex)&&textContrast(hex)>=4.5)return setColor(registry,name,hex);}
+    throw Error('没有可用的独立分类颜色');
+  }
+  function ensureCategoryColors(names,registry){for(const name of new Set(Object.keys(registry).concat(names)))color(name,registry);return registry;}
   const duration=n=>{const m=Math.floor(n/60000);return (m>=60?Math.floor(m/60)+'小时':'')+(m%60||m<60?m%60+'分钟':'');};
   function review(records,type,key,goal){const rows=range(records,type,key),s=aggregate(rows),names=Object.keys(s.cats).sort((a,b)=>s.cats[b]-s.cats[a]);if(!s.total)return '这个周期还没有已保存的时间记录，暂时无法分析时间分配。可以先记录一段实际活动，结束后保存；有数据后再生成复盘，避免把没有记录的时间误认为休息或空闲。';
     let text='本'+({day:'日',week:'周',month:'月',year:'年'}[type])+'累计记录'+duration(s.total)+'，'+names.slice(0,2).map(n=>n+duration(s.cats[n])).join('，')+'。'+names[0]+'占'+Math.round(s.percent[names[0]])+'%。';
@@ -59,5 +87,5 @@
     const review=value('autoReviewSettings');if(review&&(typeof review.enabled!=='boolean'||!clock(review.time)))throw Error('自动复盘设置不正确');
     const health=value('healthReminders');if(health){if(typeof health.enabled!=='boolean'||typeof health.system!=='boolean'||typeof health.sound!=='boolean'||!clock(health.dndStart)||!clock(health.dndEnd)||!health.categories||!health.types)throw Error('提醒设置不正确');for(const type of Object.keys(reminderDefaults().types)){const rule=health.types[type];if(!rule||typeof rule.enabled!=='boolean'||!Number.isInteger(rule.minutes)||rule.minutes<1||rule.minutes>240)throw Error('提醒间隔不正确');}}
     if(b.images.some(i=>!i||!Number.isInteger(i.id)||i.id<1||typeof i.data!=='string'||!/^data:image\/(png|jpeg|gif|webp);base64,/.test(i.data)))throw Error('图片格式不正确');return b;}
-  return {uid,day,date,bounds,idle,elapsed,transition,slices,range,aggregate,color,review,reminderDefaults,quiet,reminder,validateBackup};
+  return {uid,day,date,bounds,idle,elapsed,transition,slices,range,aggregate,color,ensureCategoryColors,colorDistance,textContrast,review,reminderDefaults,quiet,reminder,validateBackup};
 });

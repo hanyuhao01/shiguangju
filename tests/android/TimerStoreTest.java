@@ -48,6 +48,12 @@ public class TimerStoreTest {
         for(String id:new String[]{"expanded","collapsed","dragHandle","tvTimer","tvTimerCollapsed","tvCategory","btnPlay","btnSave","btnCategory","btnCollapse","btnHide"})assertTrue(id,c.getResources().getIdentifier(id,"id",c.getPackageName())!=0);
         assertTrue(c.getResources().getIdentifier("floating_window","layout",c.getPackageName())!=0);
     }
+    @Test public void overlayCategoryUsesSamePersistentColorsAsMainScreen() throws Exception {
+        c.getSharedPreferences("sg_timer_v2",0).edit().putString("categoryColors","{\"工作\":\"#4fc3f7\",\"阅读\":\"#ffb74d\"}").commit();
+        android.widget.TextView badge=new android.widget.TextView(c);
+        FloatingWindowService.applyCategoryColor(c,badge,"工作");assertEquals(android.graphics.Color.parseColor("#4fc3f7"),((android.graphics.drawable.ColorDrawable)badge.getBackground()).getColor());
+        FloatingWindowService.applyCategoryColor(c,badge,"阅读");assertEquals(android.graphics.Color.parseColor("#ffb74d"),((android.graphics.drawable.ColorDrawable)badge.getBackground()).getColor());assertEquals(android.graphics.Color.parseColor("#101628"),badge.getCurrentTextColor());
+    }
     @Test public void noReminderWithoutExplicitActivitySelection() throws Exception {
         JSONObject cfg=new JSONObject("{\"enabled\":true,\"system\":true,\"categories\":{},\"types\":{\"work\":{\"enabled\":true,\"minutes\":50}}}");
         assertEquals(0,ReminderReceiver.interval(cfg,TimerStore.snapshot(c)));cfg.getJSONObject("categories").put("工作","work");assertEquals(50*60000L,ReminderReceiver.interval(cfg,TimerStore.snapshot(c)));

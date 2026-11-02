@@ -9,7 +9,7 @@ module.exports={
   command:function(op,cat,cb,fail){call('command',[op,cat||''],cb,fail);},
   ack:function(ids){call('ack',[ids]);},
   subscribe:function(cb){call('subscribe',[],cb);},
-  configure:function(cats,settings){call('configure',[cats,settings]);},
+  configure:function(cats,settings,colors){call('configure',[cats,settings,colors||{}]);},
   notificationPermission:function(cb){call('notificationPermission',[],cb);}
   ,reminderShown:function(activeMs){call('reminderShown',[Math.floor(activeMs)]);}
   ,reminderSnooze:function(activeMs){call('reminderSnooze',[Math.floor(activeMs)]);}

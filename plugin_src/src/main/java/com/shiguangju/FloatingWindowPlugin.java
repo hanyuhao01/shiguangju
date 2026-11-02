@@ -34,7 +34,7 @@ public class FloatingWindowPlugin extends CordovaPlugin {
             case "command":cb.success(TimerStore.command(c,args.getString(0),args.optString(1,"")));changed(c);return true;
             case "ack":TimerStore.acknowledge(c,args.getJSONArray(0));cb.success();return true;
             case "subscribe":listener=cb;changed(c);return true;
-            case "configure":if(!c.getSharedPreferences("sg_timer_v2",0).edit().putString("categories",args.getJSONArray(0).toString()).putString("reminders",args.getJSONObject(1).toString()).commit())throw new IllegalStateException("设置保存失败");ReminderReceiver.schedule(c);cb.success();return true;
+            case "configure":if(!c.getSharedPreferences("sg_timer_v2",0).edit().putString("categories",args.getJSONArray(0).toString()).putString("reminders",args.getJSONObject(1).toString()).putString("categoryColors",args.optJSONObject(2)==null?"{}":args.getJSONObject(2).toString()).commit())throw new IllegalStateException("设置保存失败");ReminderReceiver.schedule(c);cb.success();return true;
             case "notificationPermission":if(Build.VERSION.SDK_INT>=33&&!cordova.hasPermission(Manifest.permission.POST_NOTIFICATIONS))cordova.requestPermission(this,81,Manifest.permission.POST_NOTIFICATIONS);cb.success(Build.VERSION.SDK_INT<33||cordova.hasPermission(Manifest.permission.POST_NOTIFICATIONS)?1:0);return true;
             case "canShow":cb.success(Settings.canDrawOverlays(c)?1:0);return true;
             case "openOverlaySettings":cordova.getActivity().startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:"+c.getPackageName())));cb.success(0);return true;

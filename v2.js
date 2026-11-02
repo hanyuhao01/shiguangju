@@ -2,6 +2,9 @@
   'use strict';
   var session=load('timerSessionV2',null)||SG.idle(timerCategory),native=null,busy=false,clockBase=performance.now(),elapsedBase=0;
   var registry=load('categoryColors',{}),reminders=load('healthReminders',null)||SG.reminderDefaults(),reviewSettings=load('autoReviewSettings',{enabled:true,time:'22:00'}),reminderMark=0;
+  var oldColors=JSON.stringify(registry);registry=Object.assign(Object.create(null),registry);
+  SG.ensureCategoryColors(categories.concat(records.map(function(r){return r.category;})),registry);
+  if(oldColors!==JSON.stringify(registry)){if(!load('categoryColorsBeforeUniqueV1',null))save('categoryColorsBeforeUniqueV1',JSON.parse(oldColors));save('categoryColors',registry);}
   var originalRenderCategories=renderCategories,cachedGoalRecords=null,cachedGoalDate='',cachedGoalTotal=0;
   // User-controlled names and notes are text throughout the shared element helper.
   el=function(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
@@ -55,7 +58,7 @@
   function generate(type,date){var list=load('autoReviewsV2',{}),key=type+':'+SG.day(SG.bounds(type,date)[0]);list[key]={type:type,date:date,text:SG.review(records,type,date,getDailyGoalMs()),updatedAt:Date.now()};return save('autoReviewsV2',list);}
   var reviewRows=null,reviewDays=new Map();
   function catchup(){if(!reviewSettings.enabled)return;var today=getToday(),now=new Date(),due=new Date(today+'T'+reviewSettings.time),list=load('autoReviewsV2',{}),changed=reviewRows!==records,updated=false;if(changed){reviewRows=records;reviewDays=new Map();SG.slices(records).forEach(function(r){if(!reviewDays.has(r.date))reviewDays.set(r.date,[]);reviewDays.get(r.date).push(Object.assign({},r,{segments:r.legacy?undefined:[{start:+new Date(r.start),end:+new Date(r.end),duration:r.duration,category:r.category}]}));});}reviewDays.forEach(function(rows,d){if((d<today||(d===today&&now>=due))&&(changed||!list['day:'+d])){var nearby=rows.slice(),date=SG.date(d);for(var n=0;n<7;n++){date.setDate(date.getDate()-1);nearby=nearby.concat(reviewDays.get(SG.day(date))||[]);}list['day:'+d]={type:'day',date:d,text:SG.review(nearby,'day',d,getDailyGoalMs()),updatedAt:Date.now()};updated=true;}});if(updated)save('autoReviewsV2',list);renderReviewInsights();}
-  function configure(){if(native)native.configure(categories,reminders);}
+  function configure(){if(native)native.configure(categories,reminders,registry);}
   function reminderActiveNow(){return (session.reminderElapsed||0)+Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0));}
   function checkReminder(){
     var now=Date.now(),running=Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0)),state=Object.assign({},session,{active:session.active?Object.assign({},session.active,{start:now-running}):null}),event=SG.reminder(state,reminders,now,reminderMark);
@@ -84,7 +87,7 @@
     var reset=el('button','neu-btn','恢复提醒默认值');reset.onclick=function(){reminders=SG.reminderDefaults();persist();renderSettings();};box.appendChild(reset);
     box.appendChild(el('h3','','数据备份与恢复'));var exp=el('button','neu-btn','导出完整 JSON'),imp=el('input'),pick=el('button','neu-btn','选择备份导入');imp.type='file';imp.accept='.json,application/json';exp.onclick=exportBackup;imp.onchange=function(){if(imp.files[0])importBackup(imp.files[0]);};pick.onclick=function(){if(native)native.importFile(function(text){importBackup({size:text.length,text:function(){return Promise.resolve(text);}});},function(e){showToast(e,'info');});else imp.click();};box.append(exp,pick,imp,el('small','','导入采用合并；同一记录不重复添加，已有设置和手写内容保留。请先导出并妥善保存备份。'));imp.style.display='none';
     var restore=el('button','neu-btn','恢复导入前数据（合并）');restore.onclick=function(){var snapshot=load('preImportBackupV2',null);if(!snapshot){showToast('暂无恢复快照','info');return;}var text=JSON.stringify({app:'shiguangju',schema:2,storage:snapshot.storage,images:snapshot.images});importBackup({size:text.length,text:function(){return Promise.resolve(text);}});};box.appendChild(restore);
-    box.appendChild(el('h3','','关于应用'));box.appendChild(el('p','','拾光橘 V2.0.0 · 本地规则复盘 · 离线运行。测试版独立安装，不覆盖旧版。'));
+    box.appendChild(el('h3','','关于应用'));box.appendChild(el('p','','拾光橘 V2.0.1 · 本地规则复盘 · 离线运行。测试版独立安装，不覆盖旧版。'));
   }
   function images(){return new Promise(function(resolve,reject){var db=getDB();if(!db)return reject(Error('图片数据库尚未就绪'));var tx=db.transaction('images','readonly'),req=tx.objectStore('images').getAll();req.onsuccess=function(){resolve(req.result);};req.onerror=function(){reject(Error('读取图片失败'));};});}
   function download(data,name){var url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},60000);}

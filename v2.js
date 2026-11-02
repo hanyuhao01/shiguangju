@@ -7,7 +7,7 @@
   el=function(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
   getCatColor=function(name){var old=registry[name],color=SG.color(name,registry);if(old!==color)save('categoryColors',registry);return color;};
   function baseElapsed(){return session.segments.reduce(function(n,s){return n+s.duration;},0)+(native?(session.activeDuration||0):session.active?Math.max(0,Date.now()-session.active.start):0);}
-  function apply(s){session=s;timerState=s.state;timerCategory=s.category;elapsedBase=baseElapsed();clockBase=performance.now();timerElapsed=elapsedBase;save('timerSessionV2',s);
+  function apply(s){if(s.id!==session.id||s.category!==session.category){reminderMark=0;if($('healthCard'))$('healthCard').remove();}session=s;timerState=s.state;timerCategory=s.category;elapsedBase=baseElapsed();clockBase=performance.now();timerElapsed=elapsedBase;save('timerSessionV2',s);
     var pending=s.pending||[],ids=pending.map(function(r){return r.id;}),known=new Set(records.map(function(r){return r.id;})),merged=records.concat(pending.filter(function(r){return !known.has(r.id);}));
     if(pending.length&&save('records',merged)){records=merged;native.ack(ids);}
     updatePrimaryBtn();updateTimer();renderCategories();renderData();renderPie();renderDataBars();renderDetailList();renderReviewInsights();
@@ -56,7 +56,17 @@
   var reviewRows=null,reviewDays=new Map();
   function catchup(){if(!reviewSettings.enabled)return;var today=getToday(),now=new Date(),due=new Date(today+'T'+reviewSettings.time),list=load('autoReviewsV2',{}),changed=reviewRows!==records,updated=false;if(changed){reviewRows=records;reviewDays=new Map();SG.slices(records).forEach(function(r){if(!reviewDays.has(r.date))reviewDays.set(r.date,[]);reviewDays.get(r.date).push(Object.assign({},r,{segments:r.legacy?undefined:[{start:+new Date(r.start),end:+new Date(r.end),duration:r.duration,category:r.category}]}));});}reviewDays.forEach(function(rows,d){if((d<today||(d===today&&now>=due))&&(changed||!list['day:'+d])){var nearby=rows.slice(),date=SG.date(d);for(var n=0;n<7;n++){date.setDate(date.getDate()-1);nearby=nearby.concat(reviewDays.get(SG.day(date))||[]);}list['day:'+d]={type:'day',date:d,text:SG.review(nearby,'day',d,getDailyGoalMs()),updatedAt:Date.now()};updated=true;}});if(updated)save('autoReviewsV2',list);renderReviewInsights();}
   function configure(){if(native)native.configure(categories,reminders);}
-  function checkReminder(){if(native&&reminders.system)return;var clock=session.active?session.active.start+Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0)):Date.now(),event=SG.reminder(session,reminders,clock,reminderMark);if(!event)return;if(document.hidden)return;var card=$('healthCard');if(card)return;reminderMark=event.activeMs;card=el('aside','v2-health');card.id='healthCard';card.appendChild(el('p','',event.type==='screen'?'看屏幕一段时间了，可以看看约6米外的地方，保持20秒。':event.type==='paper'?'已经阅读'+event.minutes+'分钟，可以暂停片刻，活动身体，看看远处。':'已经专注'+event.minutes+'分钟，可以起身活动3—5分钟，放松肩颈。'));var snooze=el('button','neu-btn','5分钟后提醒'),close=el('button','neu-btn','关闭本次');snooze.onclick=function(){reminderMark=event.activeMs-event.minutes*60000+5*60000;card.remove();};close.onclick=function(){card.remove();};card.append(snooze,close);document.body.appendChild(card);if(reminders.sound)playTone(660,0.2,'sine',0.06);}
+  function reminderActiveNow(){return (session.reminderElapsed||0)+Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0));}
+  function checkReminder(){
+    var now=Date.now(),running=Math.max(0,totalNow()-session.segments.reduce(function(n,x){return n+x.duration;},0)),state=Object.assign({},session,{active:session.active?Object.assign({},session.active,{start:now-running}):null}),event=SG.reminder(state,reminders,now,reminderMark);
+    if(!event||document.hidden||$('healthCard'))return;
+    reminderMark=event.activeMs;if(native)native.reminderShown(event.activeMs);
+    var card=el('aside','v2-health');card.id='healthCard';
+    card.appendChild(el('p','',event.type==='screen'?'看屏幕一段时间了，可以看看约6米外的地方，保持20秒。':event.type==='paper'?'已经阅读'+event.minutes+'分钟，可以暂停片刻，活动身体，看看远处。':'已经专注'+event.minutes+'分钟，可以起身活动3—5分钟，放松肩颈。'));
+    var snooze=el('button','neu-btn','5分钟后提醒'),close=el('button','neu-btn','关闭本次');
+    snooze.onclick=function(){var active=reminderActiveNow();reminderMark=active-event.minutes*60000+5*60000;if(native)native.reminderSnooze(active);card.remove();};
+    close.onclick=function(){card.remove();};card.append(snooze,close);document.body.appendChild(card);if(reminders.sound)playTone(660,0.2,'sine',0.06);
+  }
   function field(parent,label,type,value,onchange){var wrap=el('label','v2-field'),input=document.createElement('input');input.type=type;if(type==='checkbox')input.checked=value;else input.value=value;wrap.append(el('span','',label),input);input.onchange=function(){onchange(type==='checkbox'?input.checked:input.value);};parent.appendChild(wrap);return input;}
   function renderSettings(){var box=$('v2Settings');if(!box)return;box.textContent='';box.appendChild(el('h3','','复盘设置'));
     field(box,'每天自动复盘','checkbox',reviewSettings.enabled,function(v){reviewSettings.enabled=v;save('autoReviewSettings',reviewSettings);catchup();});

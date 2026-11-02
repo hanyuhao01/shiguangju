@@ -53,4 +53,14 @@ public class TimerStoreTest {
         assertEquals(0,ReminderReceiver.interval(cfg,TimerStore.snapshot(c)));cfg.getJSONObject("categories").put("工作","work");assertEquals(50*60000L,ReminderReceiver.interval(cfg,TimerStore.snapshot(c)));
         cfg.getJSONObject("types").getJSONObject("work").put("enabled",false);assertEquals(0,ReminderReceiver.interval(cfg,TimerStore.snapshot(c)));
     }
+    private void enableReminder() {
+        c.getSharedPreferences("sg_timer_v2",0).edit().putString("reminders","{\"enabled\":true,\"system\":true,\"sound\":false,\"dndStart\":\"00:00\",\"dndEnd\":\"00:00\",\"categories\":{\"工作\":\"work\"},\"types\":{\"work\":{\"enabled\":true,\"minutes\":50}}}").commit();
+        org.robolectric.Shadows.shadowOf((android.app.Application)c).denyPermissions(android.Manifest.permission.POST_NOTIFICATIONS);
+    }
+    @Test public void deniedPermissionAndDuplicateAlarmDoNotCrashOrRepeat() throws Exception {
+        enableReminder();TimerStore.command(c,"start","");SystemClock.sleep(50*60000);ReminderReceiver receiver=new ReminderReceiver();receiver.onReceive(c,new android.content.Intent("check"));assertEquals(50*60000,c.getSharedPreferences("sg_timer_v2",0).getLong("reminderMark",0));SystemClock.sleep(60000);receiver.onReceive(c,new android.content.Intent("check"));assertEquals(50*60000,c.getSharedPreferences("sg_timer_v2",0).getLong("reminderMark",0));assertEquals(0,c.getSystemService(android.app.NotificationManager.class).getActiveNotifications().length);
+    }
+    @Test public void snoozeUsesFiveActiveMinutesAndNotFullInterval() throws Exception {
+        enableReminder();TimerStore.command(c,"start","");SystemClock.sleep(50*60000);ReminderReceiver receiver=new ReminderReceiver();receiver.onReceive(c,new android.content.Intent("snooze"));assertEquals(55*60000,c.getSharedPreferences("sg_timer_v2",0).getLong("reminderDueOverride",0));SystemClock.sleep(5*60000);receiver.onReceive(c,new android.content.Intent("check"));assertEquals(55*60000,c.getSharedPreferences("sg_timer_v2",0).getLong("reminderMark",0));assertEquals(0,c.getSharedPreferences("sg_timer_v2",0).getLong("reminderDueOverride",0));
+    }
 }

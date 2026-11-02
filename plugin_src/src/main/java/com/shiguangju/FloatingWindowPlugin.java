@@ -12,6 +12,9 @@ public class FloatingWindowPlugin extends CordovaPlugin {
     private static CallbackContext listener;
     private CallbackContext fileCallback;
     private String exportText;
+    public static boolean hasListener(){return listener!=null;}
+    @Override public void onPause(boolean multitasking){cordova.getActivity().getSharedPreferences("sg_timer_v2",0).edit().putBoolean("uiForeground",false).apply();}
+    @Override public void onResume(boolean multitasking){cordova.getActivity().getSharedPreferences("sg_timer_v2",0).edit().putBoolean("uiForeground",true).apply();}
     public static void changed(Context c){if(listener!=null)try{PluginResult r=new PluginResult(PluginResult.Status.OK,TimerStore.snapshot(c));r.setKeepCallback(true);listener.sendPluginResult(r);}catch(Exception e){android.util.Log.e("SGTimer","callback",e);}}
     @Override public void onReset(){listener=null;}
     @Override public void onDestroy(){listener=null;}
@@ -25,7 +28,9 @@ public class FloatingWindowPlugin extends CordovaPlugin {
                 if(exportText!=null)picker.putExtra(Intent.EXTRA_TITLE,args.optString(1,"shiguangju-backup.json"));
                 cordova.startActivityForResult(this,picker,82);return true;
             }
-            case "state":cb.success(TimerStore.snapshot(c));return true;
+            case "state":c.getSharedPreferences("sg_timer_v2",0).edit().putBoolean("uiForeground",cordova.getActivity().hasWindowFocus()).apply();cb.success(TimerStore.snapshot(c));return true;
+            case "reminderShown":c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderMark",args.getLong(0)).remove("reminderDueOverride").apply();ReminderReceiver.schedule(c);cb.success();return true;
+            case "reminderSnooze":c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderDueOverride",args.getLong(0)+5*60000).apply();ReminderReceiver.schedule(c);cb.success();return true;
             case "command":cb.success(TimerStore.command(c,args.getString(0),args.optString(1,"")));changed(c);return true;
             case "ack":TimerStore.acknowledge(c,args.getJSONArray(0));cb.success();return true;
             case "subscribe":listener=cb;changed(c);return true;

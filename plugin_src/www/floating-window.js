@@ -11,6 +11,8 @@ module.exports={
   subscribe:function(cb){call('subscribe',[],cb);},
   configure:function(cats,settings){call('configure',[cats,settings]);},
   notificationPermission:function(cb){call('notificationPermission',[],cb);}
+  ,reminderShown:function(activeMs){call('reminderShown',[Math.floor(activeMs)]);}
+  ,reminderSnooze:function(activeMs){call('reminderSnooze',[Math.floor(activeMs)]);}
   ,exportFile:function(text,name,cb,fail){call('exportFile',[text,name],cb,fail);}
   ,importFile:function(cb,fail){call('importFile',[],cb,fail);}
 };

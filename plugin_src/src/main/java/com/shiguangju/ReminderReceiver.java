@@ -18,10 +18,12 @@ public class ReminderReceiver extends BroadcastReceiver {
         NotificationManager nm=c.getSystemService(NotificationManager.class);String action=intent.getAction();
         if("snooze".equals(action)||"dismiss".equals(action)){nm.cancel(1002);JSONObject current=TimerStore.snapshot(c);long active=current.optLong("activeDuration")+current.optLong("reminderElapsed");c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderMark",active).putLong("reminderDueOverride","snooze".equals(action)?active+5*60000:0).apply();schedule(c);return;}
         JSONObject s=TimerStore.snapshot(c),cfg=settings(c);long gap=interval(cfg,s);
-        long active=s.optLong("activeDuration")+s.optLong("reminderElapsed");
-        if(gap>0&&"running".equals(s.optString("state"))&&active>=gap&&!quiet(cfg)){
+        long active=s.optLong("activeDuration")+s.optLong("reminderElapsed"),mark=c.getSharedPreferences("sg_timer_v2",0).getLong("reminderMark",0),override=c.getSharedPreferences("sg_timer_v2",0).getLong("reminderDueOverride",0);
+        boolean due=gap>0&&"running".equals(s.optString("state"))&&active>=(override>0?override:Math.max(gap,mark+gap));
+        if(due&&!quiet(cfg)){
             c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderMark",active).remove("reminderDueOverride").apply();
-            if(Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED){
+            if(c.getSharedPreferences("sg_timer_v2",0).getBoolean("uiForeground",false)&&FloatingWindowPlugin.hasListener()){FloatingWindowPlugin.changed(c);}
+            else if(Build.VERSION.SDK_INT<33||c.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED){
                 String ch=cfg.optBoolean("sound")?"sg_health_sound":"sg_health_silent";NotificationChannel channel=new NotificationChannel(ch,"健康休息提醒",NotificationManager.IMPORTANCE_DEFAULT);if(!cfg.optBoolean("sound"))channel.setSound(null,null);nm.createNotificationChannel(channel);
                 String type=cfg.getJSONObject("categories").optString(s.getString("category"),"none");String text=type.equals("screen")?"可以看看约6米外的地方，保持20秒。":type.equals("paper")?"可以暂停阅读，活动身体，看看远处。":"可以起身活动3—5分钟，放松肩颈。";
                 Notification.Builder b=new Notification.Builder(c,ch).setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("休息片刻").setContentText(text).setAutoCancel(true);
@@ -29,7 +31,7 @@ public class ReminderReceiver extends BroadcastReceiver {
                 for(String act:new String[]{"snooze","dismiss"})b.addAction(new Notification.Action.Builder(null,act.equals("snooze")?"稍后提醒":"关闭本次",PendingIntent.getBroadcast(c,act.equals("snooze")?43:44,new Intent(c,ReminderReceiver.class).setAction(act),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT)).build());
                 nm.notify(1002,b.build());
             }
-        }else c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderMark",active).remove("reminderDueOverride").apply();
+        }else if(due)c.getSharedPreferences("sg_timer_v2",0).edit().putLong("reminderMark",active).remove("reminderDueOverride").apply();
         schedule(c);
     }catch(Exception e){android.util.Log.e("SGReminder","receive",e);}}
 }

@@ -35,6 +35,9 @@
     else if(type==='day'&&goal>0){text+='已达到每日目标的'+Math.round(s.total/goal*100)+'%。';advice=s.total>=goal?'目标已达到，建议为后续安排留出休息和临时事务的缓冲。':'建议为尚未完成的目标安排一个明确时段，并给临时事务留出缓冲。';}
     else if(s.percent[names[0]]>=75)advice='时间主要集中在一个类别，建议检查下一周期是否需要为其他已计划的活动预留时段。';
     if(type==='day'){let a=date(key);a.setDate(a.getDate()-7);const prev=slices(records).filter(r=>r.date>=day(a)&&r.date<key),avg=aggregate(prev).total/7;if(avg>0)text+='比前7日平均'+(s.total>=avg?'多':'少')+duration(Math.abs(s.total-avg))+'。';}
+    const distribution=[0,0,0,0];for(const r of rows)if(!r.legacy){let p=Date.parse(r.start),end=Date.parse(r.end);while(p<end){let boundary=new Date(p);boundary.setMinutes(0,0,0);boundary.setHours(boundary.getHours()+1);let stop=Math.min(end,+boundary);const hour=new Date(p).getHours(),slot=hour<6?0:hour<12?1:hour<18?2:3;distribution[slot]+=(stop-p)*r.duration/(end-Date.parse(r.start));p=stop;}}
+    const peak=Math.max(...distribution),known=distribution.reduce((n,x)=>n+x,0);if(known>0&&peak>=known*0.65)text+='有明确时段的活动主要在'+['凌晨','上午','下午','晚间'][distribution.indexOf(peak)]+'。';
+    if(text.length+advice.length>120)text=text.replace(/比前7日平均[^。]*。/,'').replace(/有明确时段的活动[^。]*。/,'');
     return text+advice;
   }
   const reminderDefaults=()=>({enabled:false,system:false,sound:false,dndStart:'22:00',dndEnd:'08:00',types:{work:{enabled:true,minutes:50},screen:{enabled:true,minutes:20},paper:{enabled:true,minutes:45},sedentary:{enabled:true,minutes:60},exercise:{enabled:false,minutes:60},none:{enabled:false,minutes:60}},categories:{}});

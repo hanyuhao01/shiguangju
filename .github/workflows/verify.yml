@@ -34,6 +34,11 @@ jobs:
           npx cordova plugin add ./plugin_src
       - name: Build actual debug APK
         run: npx cordova build android --debug -- --packageType=apk
+      - name: Test actual Java timer, journal and overlay resources
+        run: |
+          node scripts/android-tests.cjs
+          cd platforms/android
+          ./gradlew :app:testDebugUnitTest
       - name: Verify package and signature
         run: |
           APK=platforms/android/app/build/outputs/apk/debug/app-debug.apk

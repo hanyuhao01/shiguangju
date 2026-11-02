@@ -7,11 +7,11 @@
   const day=t=>{const d=new Date(t);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
   const date=s=>new Date(s+'T00:00:00');
   function bounds(type,key){let a=date(key),b=new Date(a);if(type==='week'){a.setDate(a.getDate()-a.getDay());b=new Date(a);b.setDate(b.getDate()+7);}else if(type==='month'){a.setDate(1);b=new Date(a);b.setMonth(b.getMonth()+1);}else if(type==='year'){a=new Date(a.getFullYear(),0,1);b=new Date(a.getFullYear()+1,0,1);}else b.setDate(b.getDate()+1);return [+a,+b];}
-  function idle(category){return {schema:2,id:uid(),state:'idle',category:category||'工作',segments:[],active:null,revision:0};}
+  function idle(category){return {schema:2,id:uid(),state:'idle',category:category||'工作',segments:[],active:null,revision:0,reminderElapsed:0};}
   function elapsed(s,now){return s.segments.reduce((n,x)=>n+x.duration,0)+(s.active?Math.max(0,now-s.active.start):0);}
   function transition(input,action,now,category){let s=JSON.parse(JSON.stringify(input));s.revision++;if(action==='start'&&s.state!=='running'){s.state='running';s.active={start:now,category:s.category};}
-    if((action==='pause'||action==='save'||action==='category')&&s.active){s.segments.push({start:s.active.start,end:Math.max(s.active.start,now),duration:Math.max(0,now-s.active.start),category:s.active.category});s.active=null;s.state='paused';}
-    if(action==='category'){s.category=category;if(input.state==='running'){s.active={start:now,category};s.state='running';}}
+    if((action==='pause'||action==='save'||action==='category')&&s.active){const duration=Math.max(0,Math.floor(now-s.active.start));s.segments.push({start:s.active.start,end:s.active.start+duration,duration,category:s.active.category});s.reminderElapsed=(s.reminderElapsed||0)+duration;s.active=null;s.state='paused';}
+    if(action==='category'){s.category=category;s.reminderElapsed=0;if(input.state==='running'){s.active={start:now,category};s.state='running';}}
     if(action==='reset')return {session:idle(s.category),records:[]};
     if(action==='save'){return {session:idle(s.category),records:sessionRecords(s)};}return {session:s,records:[]};
   }
@@ -39,7 +39,7 @@
   }
   const reminderDefaults=()=>({enabled:false,system:false,sound:false,dndStart:'22:00',dndEnd:'08:00',types:{work:{enabled:true,minutes:50},screen:{enabled:true,minutes:20},paper:{enabled:true,minutes:45},sedentary:{enabled:true,minutes:60},exercise:{enabled:false,minutes:60},none:{enabled:false,minutes:60}},categories:{}});
   function quiet(now,start,end){const d=new Date(now),t=d.getHours()*60+d.getMinutes(),p=s=>Number(s.slice(0,2))*60+Number(s.slice(3));const a=p(start),b=p(end);return a===b?false:a<b?t>=a&&t<b:t>=a||t<b;}
-  function reminder(s,settings,now,mark){const type=settings.categories[s.category]||'none',rule=settings.types[type];if(!settings.enabled||s.state!=='running'||!s.active||!rule||!rule.enabled||quiet(now,settings.dndStart,settings.dndEnd))return null;const ms=now-s.active.start,interval=rule.minutes*60000;if(ms<interval||now-(mark||0)<interval)return null;return {type,minutes:rule.minutes,at:now};}
+  function reminder(s,settings,now,mark){const type=settings.categories[s.category]||'none',rule=settings.types[type];if(!settings.enabled||s.state!=='running'||!s.active||!rule||!rule.enabled||quiet(now,settings.dndStart,settings.dndEnd))return null;const ms=(s.reminderElapsed||0)+Math.max(0,now-s.active.start),interval=rule.minutes*60000;if(ms<interval||ms-(mark||0)<interval)return null;return {type,minutes:rule.minutes,at:now,activeMs:ms};}
   function validateBackup(b){if(!b||b.app!=='shiguangju'||b.schema!==2||!b.storage||typeof b.storage!=='object'||Array.isArray(b.storage)||!Array.isArray(b.images))throw Error('备份格式或版本不支持');
     for(const [k,v] of Object.entries(b.storage)){if(typeof v!=='string'||['__proto__','constructor','prototype'].includes(k))throw Error('无效存储项');JSON.parse(v);}
     const rec=JSON.parse(b.storage.records||'[]');if(!Array.isArray(rec)||rec.some(r=>!finite(r.duration)||typeof r.category!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.date)||!Number.isFinite(Date.parse(r.start))||!Number.isFinite(Date.parse(r.end))))throw Error('记录格式不正确');

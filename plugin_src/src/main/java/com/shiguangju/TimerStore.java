@@ -18,8 +18,9 @@ public final class TimerStore {
         if(!Arrays.asList("start","pause","save","reset","category").contains(op))throw new JSONException("未知计时操作");
         JSONObject s=read(c);long now=System.currentTimeMillis();boolean running="running".equals(s.optString("state"));
         if((op.equals("pause")||op.equals("save")||op.equals("category"))&&running){JSONObject a=s.getJSONObject("active");long dur=activeDuration(c,a),start=a.getLong("start");s.getJSONArray("segments").put(new JSONObject().put("start",start).put("end",start+dur).put("duration",dur).put("category",a.getString("category")));s.remove("active");s.put("state","paused");}
+        if((op.equals("pause")||op.equals("category"))&&running){JSONObject last=s.getJSONArray("segments").getJSONObject(s.getJSONArray("segments").length()-1);s.put("reminderElapsed",s.optLong("reminderElapsed")+last.getLong("duration"));}
         if(op.equals("start")&&!running)s.put("active",active(c,s.getString("category"),now)).put("state","running");
-        if(op.equals("category")){s.put("category",cat);if(running)s.put("active",active(c,cat,now)).put("state","running");}
+        if(op.equals("category")){s.put("category",cat).put("reminderElapsed",0);if(running)s.put("active",active(c,cat,now)).put("state","running");}
         JSONArray pending=new JSONArray(c.getSharedPreferences("sg_timer_v2",0).getString("pending","[]"));
         if(op.equals("save")){
             JSONArray segs=s.getJSONArray("segments");SimpleDateFormat iso=new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",Locale.US);iso.setTimeZone(TimeZone.getTimeZone("UTC"));SimpleDateFormat day=new SimpleDateFormat("yyyy-MM-dd",Locale.US);
@@ -27,6 +28,7 @@ public final class TimerStore {
             s=idle(s.getString("category"));
         }else if(op.equals("reset"))s=idle(s.getString("category"));
         s.put("revision",s.optLong("revision")+1);
+        if(op.equals("category")||op.equals("reset")||op.equals("save"))c.getSharedPreferences("sg_timer_v2",0).edit().remove("reminderDueOverride").remove("reminderMark").apply();
         if(!c.getSharedPreferences("sg_timer_v2",0).edit().putString("pending",pending.toString()).putString("state",s.toString()).commit())throw new IllegalStateException("无法持久化计时，请重试");
         ReminderReceiver.schedule(c);return snapshot(c);
     }

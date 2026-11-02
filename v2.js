@@ -1,0 +1,103 @@
+(function(){
+  'use strict';
+  var session=load('timerSessionV2',null)||SG.idle(timerCategory),native=null,busy=false,clockBase=performance.now(),elapsedBase=0;
+  var registry=load('categoryColors',{}),reminders=load('healthReminders',null)||SG.reminderDefaults(),reviewSettings=load('autoReviewSettings',{enabled:true,time:'22:00'}),reminderMark=0;
+  var originalRenderCategories=renderCategories;
+  // User-controlled names and notes are text throughout the shared element helper.
+  el=function(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e;};
+  getCatColor=function(name){var color=SG.color(name,registry);if(!registry._saved||registry._saved!==JSON.stringify(registry)){save('categoryColors',registry);}return color;};
+  function baseElapsed(){return session.segments.reduce(function(n,s){return n+s.duration;},0)+(native?(session.activeDuration||0):session.active?Math.max(0,Date.now()-session.active.start):0);}
+  function apply(s){session=s;timerState=s.state;timerCategory=s.category;elapsedBase=baseElapsed();clockBase=performance.now();timerElapsed=elapsedBase;save('timerSessionV2',s);
+    var pending=s.pending||[],ids=pending.map(function(r){return r.id;}),known=new Set(records.map(function(r){return r.id;})),merged=records.concat(pending.filter(function(r){return !known.has(r.id);}));
+    if(pending.length&&save('records',merged)){records=merged;native.ack(ids);}
+    updatePrimaryBtn();updateTimer();renderCategories();renderData();renderPie();renderDataBars();renderDetailList();renderReviewInsights();
+  }
+  function command(op,cat){if(busy)return;if(window.cordova&&!native){showToast('正在恢复计时，请稍候','info');return;}busy=true;
+    if(native)native.command(op,cat,function(s){busy=false;apply(s);},function(e){busy=false;showToast('计时操作失败：'+e,'error');});
+    else {var result=SG.transition(session,op,Date.now(),cat),next=records.concat(result.records);if(result.records.length&&!save('records',next)){busy=false;return;}if(!save('timerSessionV2',result.session)){busy=false;return;}records=next;busy=false;apply(result.session);}
+    if(op==='pause'||op==='reset'||op==='save'||op==='category')reminderMark=0;
+  }
+  startTimer=function(){command('start');};stopTimer=function(){command('pause');};resetTimer=function(){if(confirm('重置当前未保存计时？'))command('reset');};
+  saveRecord=function(){if(timerState==='idle')return;command('save');};
+  togglePrimary=function(){command(timerState==='running'?'pause':'start');};
+  function totalNow(){return Math.max(0,elapsedBase+(session.state==='running'?performance.now()-clockBase:0));}
+  updateTimer=function(){timerElapsed=totalNow();$('timerDisplay').textContent=formatTime(timerElapsed);$('timerLabel').textContent=({idle:'就绪',running:'▶ 计时中',paused:'⏸ 已暂停'}[timerState])+' · '+timerCategory;
+    var today=SG.aggregate(SG.range(records,'day',getToday())).total;$('timerProgress').style.strokeDashoffset=339.3*(1-Math.min((today+timerElapsed)/getDailyGoalMs(),1));$('goalDisplay').textContent='目标 '+dailyGoalHours+'h';updateFloat();};
+  updateFloat=function(){if(!$('floatTime'))return;$('floatTime').textContent=formatTime(totalNow());$('floatPlayPause').textContent=timerState==='running'?'⏸':'▶';$('floatCat').textContent=(categoryIcons[timerCategory]||'📌')+' '+timerCategory;};
+  renderCategories=function(){originalRenderCategories();document.querySelectorAll('#categoryRow .cat-btn').forEach(function(btn,i){var cat=categories[i];btn.style.borderColor=getCatColor(cat);if(cat===timerCategory){btn.style.background=getCatColor(cat);btn.style.color='#101628';}btn.onclick=function(){if(!$('categoryRow').classList.contains('cat-edit-mode'))command('category',cat);};});
+    var add=$('categoryRow').querySelector('.cat-btn-add');add.onclick=function(){var n=prompt('新类别名称：');if(!n||!n.trim())return;n=n.trim().slice(0,40);if(categories.includes(n)){showToast('类别已存在','info');return;}categories.push(n);save('categories',categories);getCatColor(n);renderAll();renderSettings();configure();};};
+  deleteCategory=function(cat){if(!confirm('隐藏类别「'+cat+'」？历史记录会保留。'))return;if(categories.length===1){showToast('至少保留一个类别','info');return;}categories=categories.filter(function(c){return c!==cat;});save('categories',categories);if(timerCategory===cat)command('category',categories[0]);renderAll();renderSettings();configure();};
+  renderFloatCatMenu=function(){var m=$('floatCatMenu');m.textContent='';categories.forEach(function(cat){var b=el('button','float-cat-item',cat);b.onclick=function(){command('category',cat);m.classList.remove('show');};m.appendChild(b);});};
+  getRecordsForDate=function(key){return SG.range(records,'day',key);};
+  getRecordsForRange=function(type){return SG.range(records,type,getSelectedDateStr());};
+  getActiveCategories=function(){return selectedCats===null?Array.from(new Set(categories.concat(records.map(function(r){return r.category;})))):selectedCats;};
+  getDataForRangeMulti=function(type,cats){var rows=getRecordsForRange(type),ab=SG.bounds(type,getSelectedDateStr()),keys=[],labels=[];
+    if(type==='day'){for(var h=0;h<24;h++){keys.push(h);labels.push(h+'时');}}
+    else if(type==='year'){for(var m=0;m<12;m++){keys.push(m);labels.push((m+1)+'月');}}
+    else {for(var d=new Date(ab[0]);+d<ab[1];d.setDate(d.getDate()+1)){keys.push(SG.day(d));labels.push((d.getMonth()+1)+'/'+d.getDate());}}
+    return cats.map(function(cat){var vals=keys.map(function(){return 0;});rows.filter(function(r){return r.category===cat;}).forEach(function(r){
+      if(type==='day'&&!r.legacy){var a=+new Date(r.start),end=+new Date(r.end),left=r.duration;while(a<end){var b=new Date(a);b.setMinutes(0,0,0);b.setHours(b.getHours()+1);var stop=Math.min(end,+b),n=stop===end?left:Math.round(r.duration*(stop-a)/(end-(+new Date(r.start))));vals[new Date(a).getHours()]+=n;left-=n;a=stop;}}
+      else {var idx=type==='day'?new Date(r.start).getHours():type==='year'?SG.date(r.date).getMonth():keys.indexOf(r.date);if(idx>=0)vals[idx]+=r.duration;}
+    });return {cat:cat,labels:labels,values:vals};});};
+  renderData=function(){var cv=$('trendCanvas'),ctx=cv.getContext('2d'),w=320,h=200,dpr=window.devicePixelRatio||1;cv.width=w*dpr;cv.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);var cats=getActiveCategories(),series=getDataForRangeMulti(chartRange,cats),sum=SG.aggregate(SG.range(records,chartRange,getSelectedDateStr(),cats)),max=Math.max(60000,...series.flatMap(function(s){return s.values;}));
+    ctx.font='11px sans-serif';ctx.fillStyle=theme==='dark'?'#bbc2dd':'#403750';ctx.fillText('活动时长 · '+formatTime(sum.total),8,14);
+    series.forEach(function(s){ctx.strokeStyle=getCatColor(s.cat);ctx.lineWidth=2;ctx.beginPath();s.values.forEach(function(v,i){var x=25+i*280/Math.max(1,s.values.length-1),y=170-v/max*140;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();});
+    ctx.fillStyle=theme==='dark'?'#bbc2dd':'#403750';if(!sum.total)ctx.fillText('暂无已保存的记录',100,90);if(series.length)series[0].labels.forEach(function(l,i,arr){if(i%Math.ceil(arr.length/6)===0)ctx.fillText(l,20+i*280/Math.max(1,arr.length-1),193);});
+  };
+  renderDataBars=function(){var c=$('dataBars');c.textContent='';var s=SG.aggregate(SG.range(records,chartRange,getSelectedDateStr(),getActiveCategories()));Object.keys(s.cats).sort(function(a,b){return s.cats[b]-s.cats[a];}).forEach(function(cat){var row=el('div','v2-stat'),badge=el('span','',cat),value=el('span','',formatTime(s.cats[cat])+' · '+s.percent[cat].toFixed(1)+'%');badge.style.borderLeft='5px solid '+getCatColor(cat);badge.style.paddingLeft='8px';row.append(badge,value);c.appendChild(row);});c.appendChild(el('small','','合计 '+formatTime(s.total)+' · 日界线按手机当前时区；重叠活动分别累计'));};
+  renderDetailList=function(){var c=$('detailList');c.textContent='';var recs=getRecordsForDate(getSelectedDateStr()).sort(function(a,b){return new Date(b.start)-new Date(a.start);});if(!recs.length)c.appendChild(el('li','detail-empty','暂无记录'));
+    (detailExpanded?recs:recs.slice(0,4)).forEach(function(r){var li=el('li','detail-item'),badge=el('span','detail-item-cat',r.category);badge.style.background=getCatColor(r.category);badge.style.color='#101628';li.append(badge,el('span','detail-item-dur',formatTime(r.duration)));var del=el('button','detail-item-del','×');del.onclick=function(){if(!confirm('删除整条活动记录？跨日活动也会一并删除。'))return;var next=records.filter(function(x){return x!==r.source;});if(save('records',next)){records=next;renderAll();}};li.appendChild(del);c.appendChild(li);});$('detailToggle').style.display=recs.length>4?'':'none';$('detailToggle').textContent=detailExpanded?'收起':'展开('+recs.length+')';};
+  renderReviewInsights=function(){var c=$('reviewInsights');if(!c)return;c.textContent='';c.appendChild(el('div','review-insights-title','本地自动复盘 · 无需联网'));var b=el('button','neu-btn','生成 / 刷新当前'+({day:'日',week:'周',month:'月',year:'年'}[reviewType])+'复盘');b.onclick=function(){generate(reviewType,getSelectedDateStr());renderReviewInsights();};c.appendChild(b);
+    var list=load('autoReviewsV2',{}),key=reviewType+':'+SG.day(SG.bounds(reviewType,getSelectedDateStr())[0]);if(list[key])c.appendChild(el('p','',list[key].text));else c.appendChild(el('p','','选择日期后手动生成，手写笔记和评分单独保存。'));
+    var history=el('details',''),title=el('summary','','自动复盘历史');history.appendChild(title);Object.values(list).filter(function(r){return r.type===reviewType;}).sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,100).forEach(function(r){history.append(el('strong','',r.date),el('p','',r.text));});c.appendChild(history);};
+  function generate(type,date){var list=load('autoReviewsV2',{}),key=type+':'+SG.day(SG.bounds(type,date)[0]);list[key]={type:type,date:date,text:SG.review(records,type,date,getDailyGoalMs()),updatedAt:Date.now()};return save('autoReviewsV2',list);}
+  function catchup(){if(!reviewSettings.enabled)return;var today=getToday(),now=new Date(),due=new Date(today+'T'+reviewSettings.time),keys=new Set(records.map(function(r){return r.date;}));var list=load('autoReviewsV2',{});keys.forEach(function(d){if(d<today||(d===today&&now>=due))generate('day',d);});renderReviewInsights();}
+  function configure(){if(native)native.configure(categories,reminders);}
+  function checkReminder(){if(native&&reminders.system)return;var event=SG.reminder(session,reminders,Date.now(),reminderMark);if(!event)return;reminderMark=Date.now();if(document.hidden)return;var card=$('healthCard');if(card)return;card=el('aside','v2-health');card.id='healthCard';card.appendChild(el('p','',event.type==='screen'?'看屏幕一段时间了，可以看看约6米外的地方，保持20秒。':event.type==='paper'?'已经阅读'+event.minutes+'分钟，可以暂停片刻，活动身体，看看远处。':'已经专注'+event.minutes+'分钟，可以起身活动3—5分钟，放松肩颈。'));var snooze=el('button','neu-btn','5分钟后提醒'),close=el('button','neu-btn','关闭本次');snooze.onclick=function(){reminderMark=Date.now()-event.minutes*60000+5*60000;card.remove();};close.onclick=function(){card.remove();};card.append(snooze,close);document.body.appendChild(card);if(reminders.sound)playTone(660,0.2,'sine',0.06);}
+  function field(parent,label,type,value,onchange){var wrap=el('label','v2-field'),input=document.createElement('input');input.type=type;if(type==='checkbox')input.checked=value;else input.value=value;wrap.append(el('span','',label),input);input.onchange=function(){onchange(type==='checkbox'?input.checked:input.value);};parent.appendChild(wrap);return input;}
+  function renderSettings(){var box=$('v2Settings');if(!box)return;box.textContent='';box.appendChild(el('h3','','复盘设置'));
+    field(box,'每天自动复盘','checkbox',reviewSettings.enabled,function(v){reviewSettings.enabled=v;save('autoReviewSettings',reviewSettings);catchup();});
+    field(box,'尝试生成时间','time',reviewSettings.time,function(v){if(!/^\d{2}:\d{2}$/.test(v))return;reviewSettings.time=v;save('autoReviewSettings',reviewSettings);});box.appendChild(el('small','','默认22:00；后台不保证准时执行，下次打开自动补生成。手写内容保留。'));
+    box.appendChild(el('h3','','健康休息提醒'));function persist(){save('healthReminders',reminders);configure();}
+    field(box,'总开关','checkbox',reminders.enabled,function(v){reminders.enabled=v;persist();});
+    var names={work:'久坐工作',screen:'屏幕活动',paper:'纸质阅读',sedentary:'一般久坐',exercise:'运动',none:'不需要提醒'};
+    Object.keys(names).filter(function(t){return t!=='none'&&t!=='exercise';}).forEach(function(t){field(box,names[t],'checkbox',reminders.types[t].enabled,function(v){reminders.types[t].enabled=v;persist();});var input=field(box,'间隔（分钟）','number',reminders.types[t].minutes,function(v){var n=Number(v);if(!Number.isInteger(n)||n<1||n>240){showToast('请输入1至240分钟','error');renderSettings();return;}reminders.types[t].minutes=n;persist();});input.min=1;input.max=240;});
+    categories.forEach(function(cat){var wrap=el('label','v2-field'),select=document.createElement('select');wrap.append(el('span','',cat),select);Object.keys(names).forEach(function(t){var o=el('option','',names[t]);o.value=t;select.appendChild(o);});select.value=reminders.categories[cat]||'none';select.onchange=function(){reminders.categories[cat]=select.value;persist();};box.appendChild(wrap);});
+    field(box,'免打扰开始','time',reminders.dndStart,function(v){if(v){reminders.dndStart=v;persist();}});
+    field(box,'免打扰结束（相同表示关闭）','time',reminders.dndEnd,function(v){if(v){reminders.dndEnd=v;persist();}});
+    field(box,'提醒声音','checkbox',reminders.sound,function(v){reminders.sound=v;persist();});
+    field(box,'使用系统通知','checkbox',reminders.system,function(v){reminders.system=v;persist();if(v&&native)native.notificationPermission(function(ok){showToast(ok?'通知已允许':'请在系统设置中允许通知；计时不受影响','info');});});
+    box.appendChild(el('small','','默认建议可调整；类别默认不提醒，请自行选择活动类型。系统通知可能被延迟或限制。'));
+    var reset=el('button','neu-btn','恢复提醒默认值');reset.onclick=function(){reminders=SG.reminderDefaults();persist();renderSettings();};box.appendChild(reset);
+    box.appendChild(el('h3','','数据备份与恢复'));var exp=el('button','neu-btn','导出完整 JSON'),imp=el('input');imp.type='file';imp.accept='.json,application/json';exp.onclick=exportBackup;imp.onchange=function(){if(imp.files[0])importBackup(imp.files[0]);};box.append(exp,imp,el('small','','导入采用合并；同一记录不重复添加，已有设置和手写内容保留。请先导出并妥善保存备份。'));
+    box.appendChild(el('h3','','关于应用'));box.appendChild(el('p','','拾光橘 V2.0.0 · 本地规则复盘 · 离线运行。测试版独立安装，不覆盖旧版。'));
+  }
+  function images(){return new Promise(function(resolve,reject){var db=getDB();if(!db)return reject(Error('图片数据库尚未就绪'));var tx=db.transaction('images','readonly'),req=tx.objectStore('images').getAll();req.onsuccess=function(){resolve(req.result);};req.onerror=function(){reject(Error('读取图片失败'));};});}
+  function download(data,name){var url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},60000);}
+  async function exportBackup(){try{var storage={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);storage[k]=localStorage.getItem(k);}download({app:'shiguangju',schema:2,createdAt:new Date().toISOString(),storage:storage,images:await images()},'拾光橘备份-'+getToday()+'.json');showToast('已请求导出，请确认文件已保存','info');}catch(e){showToast(e.message,'error');}}
+  async function importBackup(file){try{if(file.size>50*1024*1024)throw Error('备份文件超过50MB');var b=SG.validateBackup(JSON.parse(await file.text()));if(timerState!=='idle')throw Error('请先保存当前计时再导入');if(!confirm('合并备份？现有数据会保留。建议先导出当前备份。'))return;
+      var old={},next={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);old[k]=localStorage.getItem(k);next[k]=old[k];}
+      var skip=['timerSessionV2','autoReviewLastDate'];Object.keys(b.storage).forEach(function(k){if(skip.includes(k))return;var incoming=JSON.parse(b.storage[k]),current=next[k]?JSON.parse(next[k]):null;
+        if(k==='mascots_meta')return;
+        if(Array.isArray(incoming)){var arr=Array.isArray(current)?current.slice():[],seen=new Set(arr.map(fingerprint));incoming.forEach(function(v){var f=fingerprint(v);if(!seen.has(f)){seen.add(f);arr.push(v);}});next[k]=JSON.stringify(arr);}
+        else if(incoming&&typeof incoming==='object')next[k]=JSON.stringify(Object.assign(Object.create(null),incoming,current||{}));
+        else if(current===null)next[k]=b.storage[k];
+      });
+      var db=getDB(),existing=await images(),imageSeen=new Map(existing.map(function(i){return [i.data,i.id];})),meta=load('mascots_meta',[]).slice(),toAdd=[];var max=Math.max(0,...existing.map(function(i){return i.id;}));b.images.forEach(function(img){if(imageSeen.has(img.data))return;var id=++max;imageSeen.set(img.data,id);toAdd.push({id:id,data:img.data});meta.push({id:id});});next.mascots_meta=JSON.stringify(meta);
+      // Keep a recoverable local snapshot before touching either store.
+      if(!save('preImportBackupV2',{storage:old,images:existing}))throw Error('没有空间保存导入前快照');
+      try{Object.keys(next).forEach(function(k){localStorage.setItem(k,next[k]);});await new Promise(function(resolve,reject){var tx=db.transaction('images','readwrite');toAdd.forEach(function(i){tx.objectStore('images').put(i);});tx.oncomplete=resolve;tx.onerror=function(){reject(Error('写入图片失败'));};tx.onabort=tx.onerror;});}
+      catch(e){Object.keys(next).forEach(function(k){if(!(k in old))localStorage.removeItem(k);});Object.keys(old).forEach(function(k){localStorage.setItem(k,old[k]);});throw e;}
+      showToast('合并完成，正在重新加载','success');location.reload();
+    }catch(e){showToast('未导入：'+e.message,'error');}}
+  function fingerprint(v){if(v&&v.category&&typeof v.duration==='number')return [v.date,v.start,v.end,v.duration,v.category,v.note||''].join('|');return JSON.stringify(v);}
+  function boot(){clearInterval(timerInterval);timerInterval=null;elapsedBase=baseElapsed();clockBase=performance.now();timerState=session.state;timerCategory=session.category;renderAll();renderSettings();catchup();
+    $('detailClear').onclick=function(){var rows=getRecordsForDate(getSelectedDateStr());if(!rows.length||!confirm('删除这一天涉及的整条活动记录？跨日活动也会删除。'))return;var sources=new Set(rows.map(function(r){return r.source;})),next=records.filter(function(r){return !sources.has(r);});if(save('records',next)){records=next;renderAll();}};
+    setInterval(function(){if(!document.hidden){updateTimer();checkReminder();}if(new Date().getSeconds()<2)catchup();},1000);
+    document.addEventListener('visibilitychange',function(){if(!document.hidden){if(native)native.state(apply);else {elapsedBase=baseElapsed();clockBase=performance.now();}catchup();}});
+    document.addEventListener('resume',function(){if(native)native.state(apply);catchup();});
+    document.addEventListener('deviceready',function(){native=cordova.plugins&&cordova.plugins.FloatingWindow;if(!native){showToast('原生计时插件加载失败，请勿开始新计时','error');return;}native.state(apply);native.subscribe(apply);configure();});
+    window.addEventListener('error',function(e){console.error('SG runtime',e.message);});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+})();
